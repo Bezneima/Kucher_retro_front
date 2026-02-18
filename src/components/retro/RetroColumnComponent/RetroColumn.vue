@@ -10,8 +10,34 @@
           <img src="@/assets/icons/svg/menu.svg" alt="" class="column-drag-handle__icon" />
         </span>
         <span v-if="!column.isNameEditing" class="column-header__title">{{ column.name }}</span>
-        <input v-else ref="nameInputRef" type="text" :value="column.name" @input="onNameInput" />
+        <input
+          v-else
+          ref="nameInputRef"
+          class="column-header__name-input"
+          type="text"
+          :value="column.name"
+          @input="onNameInput"
+        />
+        <button
+          ref="menuButtonRef"
+          class="column-open-menu-button"
+          type="button"
+          @click="onMenuButtonClick"
+        >
+          <SvgIcon name="menu" class="column-open-menu-button__icon" />
+        </button>
       </div>
+      <RetroColumnMenu
+        :is-open="isMenuOpen"
+        :anchor-el="menuButtonRef"
+        :column-color="column.color"
+        @close="closeMenu"
+        @edit-column="onEditColumnClick"
+        @copy-name="onCopyNameClick"
+        @set-color="onSetColumnColor"
+        @remove-color="onRemoveColumnColor"
+        @delete-column="onDeleteColumn"
+      />
       <button class="column-add-button" @click="onAddItemClick">+</button>
     </div>
     <Sortable
@@ -28,6 +54,13 @@
         <RetroColumnItem :element="element" />
       </template>
     </Sortable>
+    <ConfirmDeleteModal
+      :is-open="isDeleteColumnModalOpen"
+      title="Удалить колонку?"
+      message="Все карточки в этой колонке будут удалены. Действие нельзя отменить."
+      @close="onCloseDeleteColumnModal"
+      @confirm="onConfirmDeleteColumn"
+    />
   </div>
 </template>
 
@@ -67,6 +100,11 @@
   min-width: 0;
 }
 
+.column-header__name-input {
+  flex: 1;
+  min-width: 0;
+}
+
 .column-drag-handle {
   flex-shrink: 0;
   display: flex;
@@ -90,6 +128,30 @@
 .column-drag-handle__icon {
   width: 16px;
   height: 16px;
+  display: block;
+}
+
+.column-open-menu-button {
+  margin-left: auto;
+  width: 20px;
+  height: 20px;
+  padding: 3px;
+  border: none;
+  background: transparent;
+  border-radius: 2px;
+  cursor: pointer;
+  color: #666;
+  flex-shrink: 0;
+}
+
+.column-open-menu-button:hover {
+  background-color: color-mix(in srgb, var(--column-bg) 80%, black);
+  color: #181818;
+}
+
+.column-open-menu-button__icon {
+  width: 100%;
+  height: 100%;
   display: block;
 }
 
@@ -125,7 +187,10 @@
 import { ref, watch, onBeforeUnmount, nextTick, computed } from 'vue'
 import { Sortable } from 'sortablejs-vue3'
 import { type TRetroColumn } from '@/stores/RetroStore'
+import SvgIcon from '@/components/common/SvgIcon/SvgIcon.vue'
+import ConfirmDeleteModal from '@/components/common/ConfirmDeleteModal/ConfirmDeleteModal.vue'
 import RetroColumnItem from '../RetroColumItem/RetroColumnItem.vue'
+import RetroColumnMenu from './RetroColumnMenu.vue'
 import { useRetroStore } from '@/stores/RetroStore'
 const retroStore = useRetroStore()
 
@@ -136,7 +201,11 @@ const props = defineProps<{
 const { column } = props
 const columnHeaderRef = ref<HTMLElement | null>(null)
 const nameInputRef = ref<HTMLInputElement | null>(null)
+const menuButtonRef = ref<HTMLElement | null>(null)
+const isMenuOpen = ref(false)
+const isDeleteColumnModalOpen = ref(false)
 const sortableKey = computed(() => `${column.id}:${column.items.map((item) => item.id).join(',')}`)
+const defaultColumnColor = '#f0f0f0'
 
 const options = {
   group: 'shared',
@@ -171,6 +240,55 @@ onBeforeUnmount(() => {
 
 const onColumnHeaderClick = () => {
   retroStore.updateColumnNameStart(column.id)
+}
+
+const onMenuButtonClick = (event: MouseEvent) => {
+  event.preventDefault()
+  event.stopPropagation()
+  isMenuOpen.value = !isMenuOpen.value
+}
+
+const closeMenu = () => {
+  isMenuOpen.value = false
+}
+
+const onEditColumnClick = () => {
+  closeMenu()
+  retroStore.updateColumnNameStart(column.id)
+}
+
+const onCopyNameClick = async () => {
+  closeMenu()
+  const textToCopy = column.name.trim()
+  if (!textToCopy) return
+
+  try {
+    await navigator.clipboard.writeText(textToCopy)
+  } catch (error) {
+    console.error('Failed to copy column name', error)
+  }
+}
+
+const onSetColumnColor = (color: string) => {
+  retroStore.updateColumnColor(column.id, color)
+}
+
+const onRemoveColumnColor = () => {
+  retroStore.updateColumnColor(column.id, defaultColumnColor)
+}
+
+const onDeleteColumn = () => {
+  closeMenu()
+  isDeleteColumnModalOpen.value = true
+}
+
+const onCloseDeleteColumnModal = () => {
+  isDeleteColumnModalOpen.value = false
+}
+
+const onConfirmDeleteColumn = () => {
+  isDeleteColumnModalOpen.value = false
+  retroStore.deleteColumn(column.id)
 }
 
 const onNameInput = (event: Event) => {

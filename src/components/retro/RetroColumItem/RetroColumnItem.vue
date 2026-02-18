@@ -46,6 +46,13 @@
         <span>{{ element.id }}</span>
       </template>
     </div>
+    <ConfirmDeleteModal
+      :is-open="isDeleteCardModalOpen"
+      title="Удалить карточку?"
+      message="Карточка будет удалена без возможности восстановления."
+      @close="onCloseDeleteCardModal"
+      @confirm="onConfirmDeleteCard"
+    />
   </div>
 </template>
 
@@ -168,6 +175,7 @@
 
 <script setup lang="ts">
 import SvgIcon from '@/components/common/SvgIcon/SvgIcon.vue'
+import ConfirmDeleteModal from '@/components/common/ConfirmDeleteModal/ConfirmDeleteModal.vue'
 import RetroColumnItemMenu from './RetroColumnItemMenu.vue'
 import { ref, watch, nextTick, onMounted, onUnmounted, computed } from 'vue'
 import type { TRetroColumnItem } from '../../../stores/RetroStore'
@@ -184,6 +192,7 @@ const editText = ref(props.element.description)
 const cardRef = ref<HTMLElement | null>(null)
 const textareaRef = ref<HTMLTextAreaElement | null>(null)
 const menuButtonRef = ref<HTMLElement | null>(null)
+const isDeleteCardModalOpen = ref(false)
 
 const isLikedByMe = computed(() => props.element.likes.includes(RETRO_USER_ID))
 const itemStyle = computed(() => (props.element.color ? { '--item-bg': props.element.color } : {}))
@@ -264,6 +273,15 @@ const onEditCardClick = () => {
 
 const onDeleteCardClick = () => {
   closeMenu()
+  isDeleteCardModalOpen.value = true
+}
+
+const onCloseDeleteCardModal = () => {
+  isDeleteCardModalOpen.value = false
+}
+
+const onConfirmDeleteCard = () => {
+  isDeleteCardModalOpen.value = false
   retroStore.deleteItem(props.element.id)
 }
 

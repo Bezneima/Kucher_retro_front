@@ -23,6 +23,26 @@ export const columnActions = {
       void httpClient.patch(`/retro/columns/${columnId}/name`, { name: column.name })
     }
   },
+  updateColumnColor(this: any, columnId: number, color: string) {
+    const column = findColumnById(this, columnId)
+    if (!column) return
+
+    column.color = color
+    void httpClient.patch(`/retro/columns/${columnId}/color`, { color })
+  },
+  deleteColumn(this: any, columnId: number) {
+    const columns = getBoardColumns(this)
+    const columnIndex = columns.findIndex((column) => column.id === columnId)
+    if (columnIndex < 0) return
+
+    const [deletedColumn] = columns.splice(columnIndex, 1)
+    if (!deletedColumn) return
+
+    void httpClient.delete(`/retro/columns/${columnId}`).catch((error) => {
+      columns.splice(columnIndex, 0, deletedColumn)
+      console.error('[retro] failed to delete column', error)
+    })
+  },
 
   /** Меняет порядок колонок по индексам (после перетаскивания). */
   async reorderColumns(this: any, oldIndex: number, newIndex: number) {
