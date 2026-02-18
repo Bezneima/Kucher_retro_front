@@ -1,4 +1,5 @@
 import axios, { AxiosError, AxiosHeaders } from 'axios'
+import { clearAuthSession, getAccessToken } from '@/auth/session'
 
 const RETRO_API_BASE_URL = import.meta.env.VITE_RETRO_API_BASE_URL?.trim() ?? ''
 
@@ -16,6 +17,12 @@ httpClient.interceptors.request.use((config) => {
   if (!headers.has('Accept')) {
     headers.set('Accept', 'application/json')
   }
+  if (!headers.has('Authorization')) {
+    const accessToken = getAccessToken()
+    if (accessToken) {
+      headers.set('Authorization', `Bearer ${accessToken}`)
+    }
+  }
 
   config.headers = headers
   return config
@@ -24,6 +31,11 @@ httpClient.interceptors.request.use((config) => {
 httpClient.interceptors.response.use(
   (response) => response,
   (error: AxiosError) => {
+    if (error.response?.status === 401 && typeof window !== 'undefined' && window.location.pathname !== '/auth') {
+      clearAuthSession()
+      window.location.assign('/auth')
+    }
+
     const method = error.config?.method?.toUpperCase() ?? 'UNKNOWN'
     const url = `${error.config?.baseURL ?? ''}${error.config?.url ?? ''}`
 
@@ -39,4 +51,3 @@ httpClient.interceptors.response.use(
     return Promise.reject(error)
   },
 )
-

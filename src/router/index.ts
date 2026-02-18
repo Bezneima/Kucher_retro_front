@@ -1,13 +1,23 @@
 import { createRouter, createWebHistory } from 'vue-router'
-import RoomPage from '../pages/RoomPage.vue'
+import AuthPage from '../pages/AuthPage.vue'
+import BoardsPage from '../pages/BoardsPage.vue'
 
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
   routes: [
     {
       path: '/',
-      name: 'home',
-      component: RoomPage,
+      redirect: '/boards',
+    },
+    {
+      path: '/boards',
+      name: 'boards',
+      component: BoardsPage,
+    },
+    {
+      path: '/auth',
+      name: 'auth',
+      component: AuthPage,
     },
   ],
 })
