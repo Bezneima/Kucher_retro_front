@@ -11,6 +11,7 @@ export const normalizeColumns = (columnsData: unknown): TRetroColumn[] => {
     return {
       id: Number(rawColumn.id) || columnIndex + 1,
       name: typeof rawColumn.name === 'string' ? rawColumn.name : `Column ${columnIndex + 1}`,
+      description: typeof rawColumn.description === 'string' ? rawColumn.description : '',
       color:
         typeof rawColumn.color === 'string' && rawColumn.color
           ? rawColumn.color

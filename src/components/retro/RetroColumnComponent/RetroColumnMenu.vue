@@ -14,6 +14,7 @@
         v-if="!isColorMenuOpen"
         :column-color="props.columnColor"
         @edit-column="onEditColumnClick"
+        @edit-description="onEditDescriptionClick"
         @copy-name="onCopyNameClick"
         @open-color-menu="openColorMenu"
         @remove-color="onRemoveColorClick"
@@ -38,6 +39,7 @@ const props = defineProps<{
 const emit = defineEmits<{
   close: []
   editColumn: []
+  editDescription: []
   copyName: []
   setColor: [color: string]
   removeColor: []
@@ -138,6 +140,11 @@ const onEditColumnClick = () => {
 
 const onCopyNameClick = () => {
   emit('copyName')
+  emit('close')
+}
+
+const onEditDescriptionClick = () => {
+  emit('editDescription')
   emit('close')
 }
 

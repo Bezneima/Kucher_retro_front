@@ -16,6 +16,20 @@ export const columnActions = {
     }
     console.info(this.board)
   },
+  updateColumnDescription(this: any, columnId: number, description: string) {
+    const column = findColumnById(this, columnId)
+    if (!column) return
+
+    const previousDescription = column.description
+    column.description = description
+
+    void httpClient
+      .patch(`/retro/columns/${columnId}/description`, { description })
+      .catch((error) => {
+        column.description = previousDescription
+        console.error('[retro] failed to update column description', error)
+      })
+  },
   updateColumnNameEnd(this: any, columnId: number) {
     const column = findColumnById(this, columnId)
     if (column) {
@@ -78,6 +92,7 @@ export const columnActions = {
     const createdColumn = {
       id: Date.now() + nextColumnNumber,
       name: `Column ${nextColumnNumber}`,
+      description: '',
       color: goodCardColors[(nextColumnNumber - 1) % goodCardColors.length] ?? '#f0f0f0',
       isNameEditing: false,
       items: [],
@@ -89,9 +104,15 @@ export const columnActions = {
       .post(`/retro/boards/${boardId}/columns`, {
         name: createdColumn.name,
         color: createdColumn.color,
+        description: createdColumn.description,
       })
       .then((response) => {
-        const payload = (response?.data ?? {}) as { id?: unknown; name?: unknown; color?: unknown }
+        const payload = (response?.data ?? {}) as {
+          id?: unknown
+          name?: unknown
+          color?: unknown
+          description?: unknown
+        }
         const createdId = Number(payload.id)
 
         if (Number.isFinite(createdId) && createdId > 0) {
@@ -102,6 +123,9 @@ export const columnActions = {
         }
         if (typeof payload.color === 'string' && payload.color) {
           createdColumn.color = payload.color
+        }
+        if (typeof payload.description === 'string') {
+          createdColumn.description = payload.description
         }
       })
       .catch((error) => {

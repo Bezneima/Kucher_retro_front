@@ -27,12 +27,14 @@
           <SvgIcon name="menu" class="column-open-menu-button__icon" />
         </button>
       </div>
+      <div v-if="column.description" class="column-description">{{ column.description }}</div>
       <RetroColumnMenu
         :is-open="isMenuOpen"
         :anchor-el="menuButtonRef"
         :column-color="column.color"
         @close="closeMenu"
         @edit-column="onEditColumnClick"
+        @edit-description="onEditDescriptionClick"
         @copy-name="onCopyNameClick"
         @set-color="onSetColumnColor"
         @remove-color="onRemoveColumnColor"
@@ -60,6 +62,14 @@
       message="Все карточки в этой колонке будут удалены. Действие нельзя отменить."
       @close="onCloseDeleteColumnModal"
       @confirm="onConfirmDeleteColumn"
+    />
+    <TextEditModal
+      :is-open="isEditDescriptionModalOpen"
+      :value="descriptionDraft"
+      title="Редактировать описание колонки"
+      placeholder="Введите описание колонки"
+      @close="onCloseEditDescriptionModal"
+      @confirm="onConfirmEditDescription"
     />
   </div>
 </template>
@@ -172,6 +182,16 @@
   border: 1px solid color-mix(in srgb, var(--column-bg) 80%, black);
 }
 
+.column-description {
+  min-height: 20px;
+  padding: 0 8px;
+  font-size: 13px;
+  line-height: 1.4;
+  color: #4d4d4d;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
 .sortable-container {
   flex: 1;
   min-height: 0;
@@ -189,6 +209,7 @@ import { Sortable } from 'sortablejs-vue3'
 import { type TRetroColumn } from '@/stores/RetroStore'
 import SvgIcon from '@/components/common/SvgIcon/SvgIcon.vue'
 import ConfirmDeleteModal from '@/components/common/ConfirmDeleteModal/ConfirmDeleteModal.vue'
+import TextEditModal from '@/components/common/TextEditModal/TextEditModal.vue'
 import RetroColumnItem from '../RetroColumItem/RetroColumnItem.vue'
 import RetroColumnMenu from './RetroColumnMenu.vue'
 import { useRetroStore } from '@/stores/RetroStore'
@@ -204,6 +225,8 @@ const nameInputRef = ref<HTMLInputElement | null>(null)
 const menuButtonRef = ref<HTMLElement | null>(null)
 const isMenuOpen = ref(false)
 const isDeleteColumnModalOpen = ref(false)
+const isEditDescriptionModalOpen = ref(false)
+const descriptionDraft = ref('')
 const sortableKey = computed(() => `${column.id}:${column.items.map((item) => item.id).join(',')}`)
 const defaultColumnColor = '#f0f0f0'
 
@@ -255,6 +278,21 @@ const closeMenu = () => {
 const onEditColumnClick = () => {
   closeMenu()
   retroStore.updateColumnNameStart(column.id)
+}
+
+const onEditDescriptionClick = () => {
+  closeMenu()
+  descriptionDraft.value = column.description ?? ''
+  isEditDescriptionModalOpen.value = true
+}
+
+const onCloseEditDescriptionModal = () => {
+  isEditDescriptionModalOpen.value = false
+}
+
+const onConfirmEditDescription = (value: string) => {
+  retroStore.updateColumnDescription(column.id, value)
+  isEditDescriptionModalOpen.value = false
 }
 
 const onCopyNameClick = async () => {

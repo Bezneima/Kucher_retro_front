@@ -13,6 +13,7 @@ export type TRetroColumnItem = {
 export type TRetroColumn = {
   id: number
   name: string
+  description: string
   color: string
   isNameEditing: boolean
   items: TRetroColumnItem[]

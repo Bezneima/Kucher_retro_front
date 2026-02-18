@@ -3,6 +3,10 @@
     <img src="@/assets/icons/svg/pencil.svg" alt="" class="retro-item-menu-button__icon" />
     Редактировать колонку
   </button>
+  <button class="retro-item-menu-button" type="button" @click="onEditDescriptionClick">
+    <img src="@/assets/icons/svg/pencil.svg" alt="" class="retro-item-menu-button__icon" />
+    Редактировать описание
+  </button>
   <button class="retro-item-menu-button" type="button" @click="onCopyNameClick">
     <img src="@/assets/icons/svg/copy.svg" alt="" class="retro-item-menu-button__icon" />
     Копировать название
@@ -35,6 +39,7 @@ const defaultColor = '#f0f0f0'
 
 const emit = defineEmits<{
   editColumn: []
+  editDescription: []
   copyName: []
   openColorMenu: []
   removeColor: []
@@ -46,6 +51,7 @@ const props = defineProps<{
 }>()
 
 const onEditColumnClick = () => emit('editColumn')
+const onEditDescriptionClick = () => emit('editDescription')
 const onCopyNameClick = () => emit('copyName')
 const onOpenColorMenuClick = () => emit('openColorMenu')
 const onRemoveColorClick = () => emit('removeColor')
