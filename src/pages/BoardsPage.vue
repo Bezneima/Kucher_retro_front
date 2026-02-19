@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
 import { AxiosError } from 'axios'
+import { useRouter } from 'vue-router'
 import { httpClient } from '@/api/httpClient'
 
 type TBoard = {
@@ -12,7 +13,9 @@ type TBoard = {
 
 const boards = ref<TBoard[]>([])
 const isLoading = ref(false)
+const isCreating = ref(false)
 const errorMessage = ref('')
+const router = useRouter()
 
 const hasBoards = computed(() => boards.value.length > 0)
 
@@ -70,6 +73,31 @@ const loadBoards = async () => {
   }
 }
 
+const createBoard = async () => {
+  isCreating.value = true
+  errorMessage.value = ''
+
+  try {
+    const currentDate = new Date().toISOString().slice(0, 10)
+
+    await httpClient.post('/retro/boards', {
+      name: `Новая доска ${currentDate}`,
+      date: currentDate,
+      description: '',
+    })
+
+    await loadBoards()
+  } catch (error) {
+    errorMessage.value = getApiErrorMessage(error)
+  } finally {
+    isCreating.value = false
+  }
+}
+
+const openBoard = (boardId: number) => {
+  void router.push({ name: 'board', params: { id: boardId } })
+}
+
 onMounted(() => {
   void loadBoards()
 })
@@ -86,12 +114,24 @@ onMounted(() => {
 
     <p v-if="errorMessage" class="boards-error">{{ errorMessage }}</p>
 
-    <section v-else-if="!isLoading && !hasBoards" class="boards-empty">
-      У вас пока нет досок
+    <section class="boards-empty">
+      <p class="boards-empty-text">У вас пока нет досок</p>
+      <button class="boards-create" :disabled="isCreating" type="button" @click="createBoard">
+        {{ isCreating ? 'Создание...' : 'Создать доску' }}
+      </button>
     </section>
 
-    <ul v-else class="boards-list">
-      <li v-for="board in boards" :key="board.id" class="boards-item">
+    <ul class="boards-list">
+      <li
+        v-for="board in boards"
+        :key="board.id"
+        class="boards-item"
+        role="button"
+        tabindex="0"
+        @click="openBoard(board.id)"
+        @keydown.enter="openBoard(board.id)"
+        @keydown.space.prevent="openBoard(board.id)"
+      >
         <h2 class="board-name">{{ board.name }}</h2>
         <p v-if="board.date" class="board-date">{{ board.date }}</p>
         <p v-if="board.description" class="board-description">{{ board.description }}</p>
@@ -143,6 +183,15 @@ onMounted(() => {
   border: 1px solid #dde7f4;
   border-radius: 12px;
   padding: 14px;
+  cursor: pointer;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.boards-item:hover,
+.boards-item:focus-visible {
+  border-color: #1e88e5;
+  box-shadow: 0 0 0 2px rgba(30, 136, 229, 0.16);
+  outline: none;
 }
 
 .board-name {
@@ -166,9 +215,26 @@ onMounted(() => {
 
 .boards-empty {
   color: #617086;
+  display: grid;
+  gap: 10px;
 }
 
-.boards-reload:disabled {
+.boards-empty-text {
+  margin: 0;
+}
+
+.boards-create {
+  width: fit-content;
+  border: 1px solid #1e88e5;
+  background: #1e88e5;
+  color: #fff;
+  border-radius: 8px;
+  padding: 10px 14px;
+  cursor: pointer;
+}
+
+.boards-reload:disabled,
+.boards-create:disabled {
   opacity: 0.65;
   cursor: not-allowed;
 }

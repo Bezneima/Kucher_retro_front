@@ -7,6 +7,39 @@ export const boardActions = {
   normalizeColumns(this: any, columnsData: unknown) {
     return normalizeColumns(columnsData)
   },
+  async loadBoardData(this: any, boardData: Partial<TRetroBoard> | undefined) {
+    if (!boardData) {
+      this.board = []
+      this.lastSyncedPositions = {}
+      return
+    }
+
+    const boardId = Number(boardData.id)
+    if (!boardId) {
+      this.board = []
+      this.lastSyncedPositions = {}
+      return
+    }
+
+    const board: TRetroBoard = {
+      id: boardId,
+      name: boardData.name ?? '',
+      date: boardData.date ?? '',
+      description: boardData.description ?? '',
+      columns: [],
+    }
+
+    const boardWithColumns = boardData as Partial<TRetroBoard> & { columns?: unknown }
+    if (Array.isArray(boardWithColumns.columns)) {
+      board.columns = this.normalizeColumns(boardWithColumns.columns)
+    } else {
+      const columnsResponse = await httpClient.get(`/retro/boards/${boardId}/columns`)
+      board.columns = this.normalizeColumns(columnsResponse.data)
+    }
+
+    this.board = [board]
+    this.setLastSyncedPositions()
+  },
   async loadBoardForUser(this: any, userId = RETRO_USER_ID) {
     this.isBoardLoading = true
     try {
@@ -17,39 +50,42 @@ export const boardActions = {
       const boardsData = Array.isArray(boardsResponse.data) ? boardsResponse.data : []
       const firstBoard = boardsData[0] as Partial<TRetroBoard> | undefined
 
-      if (!firstBoard) {
-        this.board = []
-        this.lastSyncedPositions = {}
-        return
-      }
+      await this.loadBoardData(firstBoard)
+    } catch (error) {
+      console.error('[retro] failed to load board for user', userId, error)
+    } finally {
+      this.isBoardLoading = false
+    }
+  },
+  async loadBoardById(this: any, boardId: number) {
+    this.isBoardLoading = true
+    try {
+      const [boardsResponse, columnsResponse] = await Promise.all([
+        httpClient.get('/retro/boards', {
+          params: { userId: RETRO_USER_ID },
+        }),
+        httpClient.get(`/retro/boards/${boardId}/columns`),
+      ])
 
-      const boardId = Number(firstBoard.id)
-      if (!boardId) {
-        this.board = []
-        this.lastSyncedPositions = {}
-        return
-      }
+      const boardsData = Array.isArray(boardsResponse.data) ? boardsResponse.data : []
+      const rawBoard = boardsData.find(
+        (item) => Number((item as Partial<TRetroBoard>)?.id) === boardId,
+      ) as Partial<TRetroBoard> | undefined
 
       const board: TRetroBoard = {
         id: boardId,
-        name: typeof firstBoard.name === 'string' ? firstBoard.name : `Board ${boardId}`,
-        date: typeof firstBoard.date === 'string' ? firstBoard.date : '',
-        description: typeof firstBoard.description === 'string' ? firstBoard.description : '',
-        columns: [],
-      }
-
-      const boardWithColumns = firstBoard as Partial<TRetroBoard> & { columns?: unknown }
-      if (Array.isArray(boardWithColumns.columns)) {
-        board.columns = this.normalizeColumns(boardWithColumns.columns)
-      } else {
-        const columnsResponse = await httpClient.get(`/retro/boards/${boardId}/columns`)
-        board.columns = this.normalizeColumns(columnsResponse.data)
+        name: typeof rawBoard?.name === 'string' ? rawBoard.name : `Board ${boardId}`,
+        date: typeof rawBoard?.date === 'string' ? rawBoard.date : '',
+        description: typeof rawBoard?.description === 'string' ? rawBoard.description : '',
+        columns: this.normalizeColumns(columnsResponse.data),
       }
 
       this.board = [board]
       this.setLastSyncedPositions()
     } catch (error) {
-      console.error('[retro] failed to load board for user', userId, error)
+      console.error('[retro] failed to load board by id', boardId, error)
+      this.board = []
+      this.lastSyncedPositions = {}
     } finally {
       this.isBoardLoading = false
     }
