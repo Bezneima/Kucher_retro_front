@@ -1,4 +1,5 @@
 import { computed, onBeforeUnmount, ref } from 'vue'
+import debounce from 'lodash.debounce'
 import { retroBoardsApiClient, teamsApiClient, toTeamBoardsApiError } from '../api/teamBoardsClient'
 import type {
   ApiUiError,
@@ -53,6 +54,8 @@ const toUiError = (error: unknown, fallbackMessage: string): ApiUiError => {
 const isManager = (team: TeamSummary | null) => {
   return team?.role === 'OWNER' || team?.role === 'ADMIN'
 }
+
+const RELOAD_DEBOUNCE_MS = 300
 
 export const useTeamsDashboard = () => {
   const teams = ref<TeamSummary[]>([])
@@ -112,7 +115,9 @@ export const useTeamsDashboard = () => {
       notificationTimers.delete(notificationId)
     }
 
-    notifications.value = notifications.value.filter((notification) => notification.id !== notificationId)
+    notifications.value = notifications.value.filter(
+      (notification) => notification.id !== notificationId,
+    )
   }
 
   const pushNotification = (
@@ -124,7 +129,10 @@ export const useTeamsDashboard = () => {
     notificationIdCounter += 1
     const nextNotificationId = notificationIdCounter
 
-    notifications.value = [{ id: nextNotificationId, kind, title, description }, ...notifications.value]
+    notifications.value = [
+      { id: nextNotificationId, kind, title, description },
+      ...notifications.value,
+    ]
 
     if (typeof window !== 'undefined') {
       const timerId = window.setTimeout(() => {
@@ -165,9 +173,11 @@ export const useTeamsDashboard = () => {
     }
   }
 
-  const loadBoards = async (teamId: number) => {
+  const loadBoards = async (teamId: number, noNeedSkeleton: boolean = false) => {
     const requestId = ++boardRequestId
-    isBoardsLoading.value = true
+    if (!noNeedSkeleton) {
+      isBoardsLoading.value = true
+    }
     boardsError.value = null
 
     try {
@@ -401,25 +411,29 @@ export const useTeamsDashboard = () => {
     }
   }
 
-  const reloadTeams = async () => {
+  const reloadTeams = debounce(async () => {
     await loadTeams(selectedTeamId.value ?? undefined, false)
-  }
+  }, RELOAD_DEBOUNCE_MS)
 
-  const reloadMembers = async () => {
+  const reloadMembers = debounce(async () => {
     if (!selectedTeamId.value) {
       return
     }
     await loadMembers(selectedTeamId.value)
-  }
+  }, RELOAD_DEBOUNCE_MS)
 
-  const reloadBoards = async () => {
+  const reloadBoards = debounce(async () => {
     if (!selectedTeamId.value) {
       return
     }
-    await loadBoards(selectedTeamId.value)
-  }
+    await loadBoards(selectedTeamId.value, true)
+  }, RELOAD_DEBOUNCE_MS)
 
   onBeforeUnmount(() => {
+    reloadTeams.cancel()
+    reloadMembers.cancel()
+    reloadBoards.cancel()
+
     for (const timerId of notificationTimers.values()) {
       window.clearTimeout(timerId)
     }

@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
 import type { ApiUiError, TeamAdminRole, TeamMember, TeamSummary } from '@/features/teams/types'
-import reloadIcon from '@/assets/icons/svg/reload.svg'
+import ReloadButton from '@/components/teams/ReloadButton.vue'
 import unfoldIcon from '@/assets/icons/svg/unfold.svg'
 
 const props = defineProps<{
@@ -73,19 +73,11 @@ const onMemberRoleChange = (event: Event, member: TeamMember) => {
         <h2 class="team-panel-title">Участники</h2>
         <p v-if="team" class="team-panel-subtitle">{{ team.name }}</p>
       </div>
-      <button
-        class="team-panel-reload"
-        type="button"
+      <ReloadButton
         :disabled="isLoading || !team"
-        aria-label="Обновить"
+        :is-loading="isLoading"
         @click="emit('reload')"
-      >
-        <img
-          :class="['team-panel-reload-icon', { 'team-panel-reload-icon--loading': isLoading }]"
-          :src="reloadIcon"
-          alt=""
-        />
-      </button>
+      />
     </header>
 
     <div v-if="!team" class="state">
@@ -136,8 +128,8 @@ const onMemberRoleChange = (event: Event, member: TeamMember) => {
         </p>
       </div>
 
-      <div v-else-if="isLoading" class="skeleton-list" aria-hidden="true">
-        <div v-for="index in 4" :key="index" class="skeleton-row" />
+      <div v-else-if="isLoading && members.length === 0" class="skeleton-list" aria-hidden="true">
+        <div v-for="index in 1" :key="index" class="skeleton-row" />
       </div>
 
       <div v-else-if="members.length === 0" class="state">
@@ -230,29 +222,6 @@ const onMemberRoleChange = (event: Event, member: TeamMember) => {
   margin: 4px 0 0;
   color: #4c607f;
   font-size: 14px;
-}
-
-.team-panel-reload {
-  border: 1px solid #cedbed;
-  background: #fff;
-  border-radius: 8px;
-  padding: 10px 10px;
-  cursor: pointer;
-}
-
-.team-panel-reload:disabled {
-  opacity: 0.65;
-  cursor: not-allowed;
-}
-
-.team-panel-reload-icon {
-  width: 14px;
-  height: 14px;
-  display: block;
-}
-
-.team-panel-reload-icon--loading {
-  animation: reload-spin 0.85s linear infinite;
 }
 
 .member-form {
@@ -420,15 +389,6 @@ const onMemberRoleChange = (event: Event, member: TeamMember) => {
 .member-role--owner {
   color: #283f6a;
   background: #e2eafb;
-}
-
-@keyframes reload-spin {
-  0% {
-    transform: rotate(0deg);
-  }
-  100% {
-    transform: rotate(360deg);
-  }
 }
 
 .member-role--admin {

@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
 import type { ApiUiError, RetroBoardSummary, TeamSummary } from '@/features/teams/types'
-import reloadIcon from '@/assets/icons/svg/reload.svg'
+import ReloadButton from '@/components/teams/ReloadButton.vue'
 
 const props = defineProps<{
   team: TeamSummary | null
@@ -111,19 +111,11 @@ const formatBoardDate = (value: string | null) => {
         />
       </label>
       <div class="team-panel-actions">
-        <button
-          class="team-panel-reload"
-          type="button"
+        <ReloadButton
           :disabled="isLoading || !team"
-          aria-label="Обновить"
+          :is-loading="isLoading"
           @click="emit('reload')"
-        >
-          <img
-            :class="['team-panel-reload-icon', { 'team-panel-reload-icon--loading': isLoading }]"
-            :src="reloadIcon"
-            alt=""
-          />
-        </button>
+        />
         <button
           v-if="canManage"
           class="team-panel-create"
@@ -148,10 +140,6 @@ const formatBoardDate = (value: string | null) => {
           {{ error.description }}
           <span v-if="error.status" class="state-status">[{{ error.status }}]</span>
         </p>
-      </div>
-
-      <div v-else-if="isLoading" class="board-skeleton-list" aria-hidden="true">
-        <div v-for="index in 3" :key="index" class="board-skeleton" />
       </div>
 
       <div v-else-if="boards.length === 0" class="state">
@@ -303,29 +291,6 @@ const formatBoardDate = (value: string | null) => {
 .team-panel-create:disabled {
   opacity: 0.7;
   cursor: not-allowed;
-}
-
-.team-panel-reload {
-  border: 1px solid #cedbed;
-  background: #fff;
-  border-radius: 8px;
-  padding: 10px 10px;
-  cursor: pointer;
-}
-
-.team-panel-reload:disabled {
-  opacity: 0.65;
-  cursor: not-allowed;
-}
-
-.team-panel-reload-icon {
-  width: 14px;
-  height: 14px;
-  display: block;
-}
-
-.team-panel-reload-icon--loading {
-  animation: reload-spin 0.85s linear infinite;
 }
 
 .board-form-label {
@@ -539,15 +504,6 @@ const formatBoardDate = (value: string | null) => {
   }
   100% {
     background-position: -200% 0;
-  }
-}
-
-@keyframes reload-spin {
-  0% {
-    transform: rotate(0deg);
-  }
-  100% {
-    transform: rotate(360deg);
   }
 }
 

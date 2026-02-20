@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
 import type { ApiUiError, TeamSummary } from '@/features/teams/types'
-import reloadIcon from '@/assets/icons/svg/reload.svg'
+import ReloadButton from '@/components/teams/ReloadButton.vue'
 
 const props = defineProps<{
   teams: TeamSummary[]
@@ -84,7 +84,7 @@ watch(
     </header>
 
     <section class="teams-sidebar-content">
-      <div v-if="teams.length > 0 && !isLoading && !error" class="teams-search-row">
+      <div v-if="teams.length > 0 && !error" class="teams-search-row">
         <label class="teams-search-label">
           <input
             v-model="teamSearchQuery"
@@ -94,22 +94,10 @@ watch(
             placeholder="Введите название команды"
           />
         </label>
-        <button
-          class="teams-reload-btn"
-          type="button"
-          :disabled="isLoading"
-          aria-label="Обновить"
-          @click="emit('reload')"
-        >
-          <img
-            :class="['teams-reload-icon', { 'teams-reload-icon--loading': isLoading }]"
-            :src="reloadIcon"
-            alt=""
-          />
-        </button>
+        <ReloadButton :disabled="isLoading" :is-loading="isLoading" @click="emit('reload')" />
       </div>
 
-      <div v-if="isLoading" class="skeleton-list" aria-hidden="true">
+      <div v-if="isLoading && teams.length === 0" class="skeleton-list" aria-hidden="true">
         <div v-for="index in 4" :key="index" class="skeleton-item" />
       </div>
 
@@ -222,19 +210,6 @@ watch(
   gap: 8px;
 }
 
-.teams-reload-btn {
-  border: 1px solid #c8d8ec;
-  background: #fff;
-  border-radius: 8px;
-  height: 36px;
-  padding: 0 10px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  cursor: pointer;
-  flex-shrink: 0;
-}
-
 .teams-create-trigger-btn {
   border: 0;
   border-radius: 8px;
@@ -245,24 +220,9 @@ watch(
   cursor: pointer;
 }
 
-.teams-reload-btn:disabled {
-  opacity: 0.6;
-  cursor: not-allowed;
-}
-
 .teams-create-trigger-btn:disabled {
   opacity: 0.7;
   cursor: not-allowed;
-}
-
-.teams-reload-icon {
-  width: 14px;
-  height: 14px;
-  display: block;
-}
-
-.teams-reload-icon--loading {
-  animation: reload-spin 0.85s linear infinite;
 }
 
 .teams-sidebar-content {
@@ -479,15 +439,6 @@ watch(
 .skeleton-list {
   display: grid;
   gap: 8px;
-}
-
-@keyframes reload-spin {
-  0% {
-    transform: rotate(0deg);
-  }
-  100% {
-    transform: rotate(360deg);
-  }
 }
 
 .skeleton-item {
