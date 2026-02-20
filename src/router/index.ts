@@ -3,6 +3,7 @@ import { getAccessToken } from '@/auth/session'
 import AuthPage from '../pages/AuthPage.vue'
 import RoomPage from '../pages/RoomPage.vue'
 import TeamsPage from '../pages/TeamsPage.vue'
+import ProfilePage from '../pages/ProfilePage.vue'
 
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
@@ -24,6 +25,11 @@ const router = createRouter({
       path: '/boards/:id',
       name: 'board',
       component: RoomPage,
+    },
+    {
+      path: '/profile',
+      name: 'profile',
+      component: ProfilePage,
     },
     {
       path: '/auth',

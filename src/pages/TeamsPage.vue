@@ -44,7 +44,7 @@ const openBoard = async (boardId: number) => {
 }
 
 const openProfile = async () => {
-  await router.push({ name: 'teams' })
+  await router.push({ name: 'profile' })
 }
 
 const logout = async () => {

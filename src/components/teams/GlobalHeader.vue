@@ -83,7 +83,9 @@ onBeforeUnmount(() => {
       <img class="teams-top-strip-logo" :src="logoSrc" alt="Logo" />
 
       <div ref="menuRootRef" class="teams-user-menu">
-        <p class="teams-user-name">{{ props.userName }}</p>
+        <button class="teams-user-name" type="button" @click="onProfileClick">
+          {{ props.userName }}
+        </button>
         <button
           class="teams-user-menu-trigger"
           type="button"
@@ -165,6 +167,9 @@ onBeforeUnmount(() => {
 
 .teams-user-name {
   margin: 0;
+  padding: 0;
+  border: none;
+  background: transparent;
   font-size: 14px;
   color: #33445f;
   max-width: 240px;
@@ -172,6 +177,12 @@ onBeforeUnmount(() => {
   text-overflow: ellipsis;
   white-space: nowrap;
   font-weight: 600;
+  cursor: pointer;
+}
+
+.teams-user-name:hover {
+  color: #1f3f72;
+  text-decoration: underline;
 }
 
 .teams-user-menu-trigger {

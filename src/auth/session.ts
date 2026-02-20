@@ -65,3 +65,18 @@ export const clearAuthSession = () => {
 export const getUserName = () => {
   return localStorage.getItem(USER_NAME_STORAGE_KEY) ?? localStorage.getItem(USER_EMAIL_STORAGE_KEY)
 }
+
+export const getUserEmail = () => {
+  return localStorage.getItem(USER_EMAIL_STORAGE_KEY)
+}
+
+export const setUserName = (name: string) => {
+  const normalizedName = name.trim()
+
+  if (normalizedName) {
+    localStorage.setItem(USER_NAME_STORAGE_KEY, normalizedName)
+    return
+  }
+
+  localStorage.removeItem(USER_NAME_STORAGE_KEY)
+}
