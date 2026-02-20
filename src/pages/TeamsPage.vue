@@ -1,6 +1,8 @@
 <script setup lang="ts">
-import { onMounted, watch } from 'vue'
+import { onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
+import { clearAuthSession, getUserName } from '@/auth/session'
+import GlobalHeader from '@/components/teams/GlobalHeader.vue'
 import NotificationStack from '@/components/teams/NotificationStack.vue'
 import TeamBoardsPanel from '@/components/teams/TeamBoardsPanel.vue'
 import TeamMembersPanel from '@/components/teams/TeamMembersPanel.vue'
@@ -10,6 +12,7 @@ import { useTeamsDashboard } from '@/features/teams/composables/useTeamsDashboar
 const route = useRoute()
 const router = useRouter()
 const dashboard = useTeamsDashboard()
+const userName = ref(getUserName() || '')
 
 const parseTeamIdQueryParam = (value: unknown): number | undefined => {
   const rawValue = Array.isArray(value) ? value[0] : value
@@ -40,6 +43,15 @@ const openBoard = async (boardId: number) => {
   })
 }
 
+const openProfile = async () => {
+  await router.push({ name: 'teams' })
+}
+
+const logout = async () => {
+  clearAuthSession()
+  await router.replace({ name: 'auth' })
+}
+
 onMounted(() => {
   void dashboard.initialize(parseTeamIdQueryParam(route.query.teamId))
 })
@@ -63,6 +75,8 @@ watch(
 
 <template>
   <main class="teams-page">
+    <GlobalHeader :user-name="userName" @profile="openProfile" @logout="logout" />
+
     <NotificationStack
       :notifications="dashboard.notifications.value"
       @dismiss="dashboard.dismissNotification"
@@ -125,9 +139,10 @@ watch(
 
 <style scoped>
 .teams-page {
+  --teams-page-padding: 20px;
   min-height: 100%;
   box-sizing: border-box;
-  padding: 20px;
+  padding: var(--teams-page-padding);
   background: linear-gradient(140deg, #f6f8fd 0%, #ecf3ff 45%, #f7fafd 100%);
 }
 

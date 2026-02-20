@@ -25,34 +25,6 @@ if (getAccessToken()) {
 const isRegisterMode = computed(() => mode.value === 'register')
 const submitLabel = computed(() => (isRegisterMode.value ? 'Создать аккаунт' : 'Войти'))
 
-const extractAuthPayload = (payload: unknown) => {
-  const response = payload as
-    | {
-        accessToken?: unknown
-        refreshToken?: unknown
-        user?: { name?: unknown }
-        name?: unknown
-        data?: {
-          accessToken?: unknown
-          refreshToken?: unknown
-          user?: { name?: unknown }
-          name?: unknown
-        }
-      }
-    | undefined
-
-  const root = response?.data ?? response
-  const accessTokenCandidate = root?.accessToken
-  const refreshTokenCandidate = root?.refreshToken
-  const userNameCandidate = root?.user?.name ?? root?.name
-
-  return {
-    accessToken: typeof accessTokenCandidate === 'string' ? accessTokenCandidate : '',
-    refreshToken: typeof refreshTokenCandidate === 'string' ? refreshTokenCandidate : undefined,
-    userName: typeof userNameCandidate === 'string' ? userNameCandidate : undefined,
-  }
-}
-
 const getApiErrorMessage = (error: unknown) => {
   if (!(error instanceof AxiosError)) {
     return 'Не удалось выполнить запрос. Повторите позже.'
@@ -85,13 +57,12 @@ const submit = async () => {
     }
 
     const response = await httpClient.post(endpoint, payload)
-    const authPayload = extractAuthPayload(response.data)
 
-    if (!authPayload.accessToken) {
+    if (!response.data?.accessToken) {
       throw new Error('Сервер не вернул accessToken')
     }
 
-    setAuthSession(authPayload)
+    setAuthSession(response.data)
     await router.replace('/teams')
   } catch (error) {
     errorMessage.value = getApiErrorMessage(error)
