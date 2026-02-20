@@ -1,0 +1,579 @@
+<script setup lang="ts">
+import { computed, ref, watch } from 'vue'
+import type { ApiUiError, RetroBoardSummary, TeamSummary } from '@/features/teams/types'
+import reloadIcon from '@/assets/icons/svg/reload.svg'
+
+const props = defineProps<{
+  team: TeamSummary | null
+  boards: RetroBoardSummary[]
+  canManage: boolean
+  isLoading: boolean
+  isCreating: boolean
+  error: ApiUiError | null
+  name: string
+  description: string
+}>()
+
+const emit = defineEmits<{
+  reload: []
+  createBoard: []
+  openBoard: [boardId: number]
+  'update:name': [value: string]
+  'update:description': [value: string]
+}>()
+
+const isCreateModalOpen = ref(false)
+const isCreateSubmitPending = ref(false)
+const boardSearchQuery = ref('')
+
+const filteredBoards = computed(() => {
+  const normalizedQuery = boardSearchQuery.value.trim().toLowerCase()
+
+  if (!normalizedQuery) {
+    return props.boards
+  }
+
+  return props.boards.filter((board) => board.name.toLowerCase().includes(normalizedQuery))
+})
+
+const openCreateModal = () => {
+  isCreateModalOpen.value = true
+}
+
+const closeCreateModal = () => {
+  if (props.isCreating) {
+    return
+  }
+
+  isCreateModalOpen.value = false
+  isCreateSubmitPending.value = false
+}
+
+const submitCreateBoard = () => {
+  isCreateSubmitPending.value = true
+  emit('createBoard')
+}
+
+watch(
+  () => props.isCreating,
+  (isCreating) => {
+    if (isCreating || !isCreateSubmitPending.value) {
+      return
+    }
+
+    if (!props.error) {
+      isCreateModalOpen.value = false
+    }
+
+    isCreateSubmitPending.value = false
+  },
+)
+
+watch(
+  () => props.team?.id,
+  () => {
+    boardSearchQuery.value = ''
+  },
+)
+
+const formatBoardDate = (value: string | null) => {
+  if (!value) {
+    return ''
+  }
+
+  const date = new Date(value)
+  if (!Number.isFinite(date.getTime())) {
+    return value
+  }
+
+  return date.toLocaleDateString('ru-RU', {
+    year: 'numeric',
+    month: 'long',
+    day: 'numeric',
+  })
+}
+</script>
+
+<template>
+  <section class="team-panel">
+    <header class="team-panel-header">
+      <div>
+        <h2 class="team-panel-title">Ретро-доски команды</h2>
+        <p v-if="team" class="team-panel-subtitle">{{ team.name }}</p>
+      </div>
+      <label v-if="team && !isLoading && !error && boards.length > 0" class="boards-search-label">
+        <input
+          v-model="boardSearchQuery"
+          class="boards-search-input"
+          type="text"
+          maxlength="120"
+          placeholder="Введите название доски"
+        />
+      </label>
+      <div class="team-panel-actions">
+        <button
+          class="team-panel-reload"
+          type="button"
+          :disabled="isLoading || !team"
+          aria-label="Обновить"
+          @click="emit('reload')"
+        >
+          <img
+            :class="['team-panel-reload-icon', { 'team-panel-reload-icon--loading': isLoading }]"
+            :src="reloadIcon"
+            alt=""
+          />
+        </button>
+        <button
+          v-if="canManage"
+          class="team-panel-create"
+          type="button"
+          :disabled="isCreating || !team"
+          @click="openCreateModal"
+        >
+          Создать
+        </button>
+      </div>
+    </header>
+
+    <div v-if="!team" class="state">
+      <p class="state-title">Команда не выбрана</p>
+      <p class="state-description">Выберите команду слева, чтобы увидеть ее ретро-доски.</p>
+    </div>
+
+    <template v-else>
+      <div v-if="error" class="state state--error">
+        <p class="state-title">{{ error.title }}</p>
+        <p class="state-description">
+          {{ error.description }}
+          <span v-if="error.status" class="state-status">[{{ error.status }}]</span>
+        </p>
+      </div>
+
+      <div v-else-if="isLoading" class="board-skeleton-list" aria-hidden="true">
+        <div v-for="index in 3" :key="index" class="board-skeleton" />
+      </div>
+
+      <div v-else-if="boards.length === 0" class="state">
+        <p class="state-title">Досок пока нет</p>
+        <p class="state-description">Создайте первую доску для выбранной команды.</p>
+      </div>
+
+      <div v-else-if="filteredBoards.length === 0" class="state">
+        <p class="state-title">Доска не найдена</p>
+        <p class="state-description">Попробуйте изменить поисковый запрос.</p>
+      </div>
+
+      <ul v-else class="boards-list">
+        <li v-for="board in filteredBoards" :key="board.id">
+          <button class="board-item" type="button" @click="emit('openBoard', board.id)">
+            <div class="board-item-main">
+              <p class="board-item-title">{{ board.name }}</p>
+              <p v-if="board.description" class="board-item-description">{{ board.description }}</p>
+            </div>
+            <div class="board-item-side">
+              <span v-if="board.date" class="board-item-date">{{
+                formatBoardDate(board.date)
+              }}</span>
+              <span class="board-item-open">Открыть</span>
+            </div>
+          </button>
+        </li>
+      </ul>
+    </template>
+
+    <div v-if="isCreateModalOpen" class="board-modal-overlay" @click.self="closeCreateModal">
+      <div class="board-modal" role="dialog" aria-modal="true" aria-label="Создать доску">
+        <button
+          class="board-modal-close"
+          type="button"
+          :disabled="isCreating"
+          @click="closeCreateModal"
+        >
+          ×
+        </button>
+
+        <h3 class="board-modal-title">Создать доску</h3>
+
+        <form class="board-modal-form" @submit.prevent="submitCreateBoard">
+          <label class="board-form-label">
+            <span>Название</span>
+            <input
+              :value="name"
+              class="board-form-input"
+              type="text"
+              maxlength="120"
+              placeholder="Sprint 24 Retro"
+              :disabled="isCreating"
+              @input="emit('update:name', ($event.target as HTMLInputElement).value)"
+            />
+          </label>
+
+          <label class="board-form-label board-form-label--description">
+            <span>Описание</span>
+            <textarea
+              :value="description"
+              class="board-form-input board-form-textarea"
+              rows="3"
+              maxlength="500"
+              placeholder="Краткое описание ретроспективы"
+              :disabled="isCreating"
+              @input="emit('update:description', ($event.target as HTMLTextAreaElement).value)"
+            />
+          </label>
+
+          <button class="board-form-submit" type="submit" :disabled="isCreating">
+            {{ isCreating ? 'Создание...' : 'Создать' }}
+          </button>
+        </form>
+      </div>
+    </div>
+  </section>
+</template>
+
+<style scoped>
+.team-panel {
+  border: 1px solid #d9e4f2;
+  border-radius: 14px;
+  background: #fff;
+  padding: 14px;
+  display: grid;
+  gap: 12px;
+}
+
+.team-panel-header {
+  display: flex;
+  justify-content: flex-start;
+  gap: 10px;
+  align-items: flex-start;
+}
+
+.team-panel-title {
+  margin: 0;
+  font-size: 20px;
+}
+
+.team-panel-subtitle {
+  margin: 4px 0 0;
+  color: #4c607f;
+  font-size: 14px;
+}
+
+.team-panel-actions {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  flex-shrink: 0;
+}
+
+.boards-search-label {
+  flex: 1 1 380px;
+  max-width: 380px;
+  min-width: 0;
+  margin-left: auto;
+}
+
+.boards-search-input {
+  display: block;
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
+  border: 1px solid #cdd9ea;
+  border-radius: 8px;
+  padding: 9px 10px;
+  font-size: 14px;
+}
+
+.boards-search-input:focus {
+  outline: none;
+  border-color: #79a8e4;
+  box-shadow: 0 0 0 3px rgba(121, 168, 228, 0.2);
+}
+
+.team-panel-create {
+  border: 0;
+  border-radius: 8px;
+  padding: 8px 12px;
+  background: #1e88e5;
+  color: #fff;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.team-panel-create:disabled {
+  opacity: 0.7;
+  cursor: not-allowed;
+}
+
+.team-panel-reload {
+  border: 1px solid #cedbed;
+  background: #fff;
+  border-radius: 8px;
+  padding: 10px 10px;
+  cursor: pointer;
+}
+
+.team-panel-reload:disabled {
+  opacity: 0.65;
+  cursor: not-allowed;
+}
+
+.team-panel-reload-icon {
+  width: 14px;
+  height: 14px;
+  display: block;
+}
+
+.team-panel-reload-icon--loading {
+  animation: reload-spin 0.85s linear infinite;
+}
+
+.board-form-label {
+  display: grid;
+  gap: 6px;
+  color: #33445f;
+  font-size: 13px;
+}
+
+.board-form-label--description {
+  grid-column: 1 / -1;
+}
+
+.board-form-input {
+  border: 1px solid #cfdbec;
+  border-radius: 8px;
+  padding: 9px 10px;
+  font-size: 14px;
+}
+
+.board-form-textarea {
+  resize: vertical;
+}
+
+.board-form-input:focus {
+  outline: none;
+  border-color: #79a8e4;
+  box-shadow: 0 0 0 3px rgba(121, 168, 228, 0.2);
+}
+
+.board-form-submit {
+  border: 0;
+  border-radius: 8px;
+  padding: 10px 12px;
+  background: #1e88e5;
+  color: #fff;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.board-form-submit:disabled {
+  opacity: 0.7;
+  cursor: not-allowed;
+}
+
+.board-modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(13, 24, 46, 0.45);
+  display: grid;
+  place-items: center;
+  z-index: 1200;
+  padding: 16px;
+}
+
+.board-modal {
+  width: min(520px, 100%);
+  border: 1px solid #d9e4f2;
+  border-radius: 14px;
+  background: #fff;
+  padding: 18px;
+  position: relative;
+}
+
+.board-modal-title {
+  margin: 0 30px 14px 0;
+  font-size: 18px;
+}
+
+.board-modal-close {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  width: 34px;
+  height: 34px;
+  border: 0;
+  border-radius: 8px;
+  background: #eff5ff;
+  color: #1a4f8d;
+  font-size: 24px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.board-modal-close:disabled {
+  opacity: 0.7;
+  cursor: not-allowed;
+}
+
+.board-modal-form {
+  display: grid;
+  gap: 10px;
+}
+
+.board-readonly-note {
+  margin: 0;
+  color: #4a5f7f;
+  background: #edf4ff;
+  border: 1px solid #cfe0fa;
+  border-radius: 10px;
+  padding: 10px 12px;
+  font-size: 14px;
+}
+
+.boards-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 10px;
+}
+
+.board-item {
+  width: 100%;
+  border: 1px solid #dce8f7;
+  border-radius: 10px;
+  padding: 12px;
+  background: #fff;
+  text-align: left;
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  align-items: center;
+  cursor: pointer;
+}
+
+.board-item:hover {
+  border-color: #b9d4f6;
+  box-shadow: 0 8px 20px rgba(45, 90, 150, 0.1);
+}
+
+.board-item-main {
+  min-width: 0;
+  display: grid;
+  gap: 4px;
+}
+
+.board-item-title {
+  margin: 0;
+  font-weight: 600;
+  color: #1b2f4b;
+}
+
+.board-item-description {
+  margin: 0;
+  color: #4a607f;
+  font-size: 14px;
+}
+
+.board-item-side {
+  display: grid;
+  justify-items: end;
+  gap: 4px;
+  flex-shrink: 0;
+}
+
+.board-item-date {
+  color: #567299;
+  font-size: 13px;
+}
+
+.board-item-open {
+  color: #1e6fc3;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.board-skeleton-list {
+  display: grid;
+  gap: 10px;
+}
+
+.board-skeleton {
+  height: 68px;
+  border-radius: 10px;
+  background: linear-gradient(90deg, #edf3fb 0%, #f6f9ff 45%, #edf3fb 100%);
+  background-size: 200% 100%;
+  animation: skeleton-loading 1.2s ease-in-out infinite;
+}
+
+.state {
+  border: 1px dashed #d0dded;
+  border-radius: 12px;
+  padding: 14px;
+  background: #f8fbff;
+}
+
+.state--error {
+  border-color: #efc8c8;
+  background: #fff5f5;
+}
+
+.state-title {
+  margin: 0;
+  font-weight: 600;
+  color: #1f3050;
+}
+
+.state-description {
+  margin: 6px 0 0;
+  color: #4c5f7f;
+}
+
+.state-status {
+  color: #7a8daa;
+}
+
+@keyframes skeleton-loading {
+  0% {
+    background-position: 200% 0;
+  }
+  100% {
+    background-position: -200% 0;
+  }
+}
+
+@keyframes reload-spin {
+  0% {
+    transform: rotate(0deg);
+  }
+  100% {
+    transform: rotate(360deg);
+  }
+}
+
+@media (max-width: 720px) {
+  .team-panel-header {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .team-panel-actions {
+    justify-content: flex-end;
+  }
+
+  .boards-search-label {
+    max-width: none;
+    width: 100%;
+    flex: auto;
+  }
+
+  .board-item {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .board-item-side {
+    justify-items: start;
+  }
+}
+</style>

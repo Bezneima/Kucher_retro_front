@@ -19,7 +19,7 @@ const form = reactive({
 })
 
 if (getAccessToken()) {
-  void router.replace('/boards')
+  void router.replace('/teams')
 }
 
 const isRegisterMode = computed(() => mode.value === 'register')
@@ -92,7 +92,7 @@ const submit = async () => {
     }
 
     setAuthSession(authPayload)
-    await router.replace('/boards')
+    await router.replace('/teams')
   } catch (error) {
     errorMessage.value = getApiErrorMessage(error)
   } finally {

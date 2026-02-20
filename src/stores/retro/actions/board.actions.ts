@@ -1,5 +1,4 @@
 import { httpClient } from '@/api/httpClient'
-import { RETRO_USER_ID } from '../constants'
 import { normalizeColumns } from '../helpers/normalize'
 import type { TRetroBoard } from '../types'
 
@@ -40,19 +39,17 @@ export const boardActions = {
     this.board = [board]
     this.setLastSyncedPositions()
   },
-  async loadBoardForUser(this: any, userId = RETRO_USER_ID) {
+  async loadBoardForUser(this: any) {
     this.isBoardLoading = true
     try {
-      const boardsResponse = await httpClient.get('/retro/boards', {
-        params: { userId },
-      })
+      const boardsResponse = await httpClient.get('/retro/boards')
 
       const boardsData = Array.isArray(boardsResponse.data) ? boardsResponse.data : []
       const firstBoard = boardsData[0] as Partial<TRetroBoard> | undefined
 
       await this.loadBoardData(firstBoard)
     } catch (error) {
-      console.error('[retro] failed to load board for user', userId, error)
+      console.error('[retro] failed to load board for user', error)
     } finally {
       this.isBoardLoading = false
     }
@@ -61,9 +58,7 @@ export const boardActions = {
     this.isBoardLoading = true
     try {
       const [boardsResponse, columnsResponse] = await Promise.all([
-        httpClient.get('/retro/boards', {
-          params: { userId: RETRO_USER_ID },
-        }),
+        httpClient.get('/retro/boards'),
         httpClient.get(`/retro/boards/${boardId}/columns`),
       ])
 

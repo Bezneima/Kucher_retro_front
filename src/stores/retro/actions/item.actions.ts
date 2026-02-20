@@ -129,7 +129,7 @@ export const itemActions = {
       }
 
       if (item.isDraft) return
-      void httpClient.patch(`/retro/items/${itemId}/like`, { userId })
+      void httpClient.patch(`/retro/items/${itemId}/like`)
       return
     }
   },
