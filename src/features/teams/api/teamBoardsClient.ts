@@ -6,6 +6,8 @@ import type {
   CreateRetroBoardRequest,
   CreateTeamRequest,
   RetroBoardSummary,
+  RetroBoardSummaryColumn,
+  RetroBoardSummaryItem,
   TeamMember,
   TeamRole,
   TeamSummary,
@@ -38,6 +40,11 @@ const asPositiveNumber = (value: unknown) => {
   return Number.isInteger(numberValue) && numberValue > 0 ? numberValue : undefined
 }
 
+const asNonNegativeNumber = (value: unknown) => {
+  const numberValue = typeof value === 'number' ? value : Number(value)
+  return Number.isInteger(numberValue) && numberValue >= 0 ? numberValue : undefined
+}
+
 const getRole = (value: unknown): TeamRole => {
   return value === 'OWNER' || value === 'ADMIN' || value === 'MEMBER' ? value : 'MEMBER'
 }
@@ -64,6 +71,72 @@ const getCollectionPayload = (payload: unknown): unknown[] => {
 const getNestedRecord = (record: TRecord, key: string): TRecord | undefined => {
   const nested = record[key]
   return isRecord(nested) ? nested : undefined
+}
+
+const DEFAULT_PREVIEW_COLUMN_COLOR = '#d7dfeb'
+
+const normalizeBoardItem = (payload: unknown, fallbackId: number): RetroBoardSummaryItem | null => {
+  if (!isRecord(payload)) {
+    return null
+  }
+
+  const id = asPositiveNumber(payload.id) ?? fallbackId
+  const color = asString(payload.color)?.trim()
+  const rowIndex = asNonNegativeNumber(payload.rowIndex ?? payload.index)
+
+  return {
+    id,
+    color: color || undefined,
+    rowIndex,
+  }
+}
+
+const sortPreviewItems = (left: RetroBoardSummaryItem, right: RetroBoardSummaryItem) => {
+  const leftRowIndex = left.rowIndex
+  const rightRowIndex = right.rowIndex
+
+  if (typeof leftRowIndex === 'number' && typeof rightRowIndex === 'number') {
+    return leftRowIndex - rightRowIndex
+  }
+  if (typeof leftRowIndex === 'number') {
+    return -1
+  }
+  if (typeof rightRowIndex === 'number') {
+    return 1
+  }
+
+  return 0
+}
+
+const normalizeBoardColumn = (payload: unknown, fallbackId: number): RetroBoardSummaryColumn | null => {
+  if (!isRecord(payload)) {
+    return null
+  }
+
+  const id = asPositiveNumber(payload.id) ?? fallbackId
+  const color = asString(payload.color)?.trim() ?? DEFAULT_PREVIEW_COLUMN_COLOR
+  const itemsPayload = Array.isArray(payload.items) ? payload.items : []
+  const items = itemsPayload
+    .map((item, itemIndex) => normalizeBoardItem(item, itemIndex + 1))
+    .filter((item): item is RetroBoardSummaryItem => Boolean(item))
+    .sort(sortPreviewItems)
+
+  return {
+    id,
+    name: asString(payload.name) ?? `Column ${id}`,
+    color,
+    items,
+  }
+}
+
+const normalizeBoardColumns = (payload: unknown): RetroBoardSummaryColumn[] => {
+  if (!Array.isArray(payload)) {
+    return []
+  }
+
+  return payload
+    .map((column, columnIndex) => normalizeBoardColumn(column, columnIndex + 1))
+    .filter((column): column is RetroBoardSummaryColumn => Boolean(column))
 }
 
 const normalizeTeam = (payload: unknown): TeamSummary | null => {
@@ -127,6 +200,7 @@ const normalizeBoard = (payload: unknown, fallbackTeamId?: number): RetroBoardSu
     name: asString(payload.name) ?? `Board ${id}`,
     date: asString(payload.date) ?? null,
     description: asString(payload.description) ?? null,
+    columns: normalizeBoardColumns(payload.columns),
   }
 }
 

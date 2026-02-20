@@ -21,6 +21,20 @@ export type RetroBoardSummary = {
   name: string
   date: string | null
   description: string | null
+  columns: RetroBoardSummaryColumn[]
+}
+
+export type RetroBoardSummaryItem = {
+  id: number
+  color?: string
+  rowIndex?: number
+}
+
+export type RetroBoardSummaryColumn = {
+  id: number
+  name: string
+  color: string
+  items: RetroBoardSummaryItem[]
 }
 
 export type CreateTeamRequest = {

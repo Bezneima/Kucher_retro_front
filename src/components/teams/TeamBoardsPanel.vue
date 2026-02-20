@@ -25,6 +25,9 @@ const emit = defineEmits<{
 const isCreateModalOpen = ref(false)
 const isCreateSubmitPending = ref(false)
 const boardSearchQuery = ref('')
+const MAX_PREVIEW_COLUMNS = 5
+const MAX_PREVIEW_ITEMS_PER_COLUMN = 5
+const DEFAULT_PREVIEW_COLUMN_COLOR = '#d7dfeb'
 
 const shouldShowCreateTile = computed(() => {
   return props.canManage && boardSearchQuery.value.trim().length === 0
@@ -113,30 +116,47 @@ const formatBoardDate = (value: string | null) => {
     day: 'numeric',
   })
 }
+
+const getBoardPreviewColumns = (board: RetroBoardSummary) => {
+  return board.columns.slice(0, MAX_PREVIEW_COLUMNS).map((column, columnIndex) => {
+    const columnColor = column.color || DEFAULT_PREVIEW_COLUMN_COLOR
+
+    return {
+      id: column.id || columnIndex + 1,
+      color: columnColor,
+      items: column.items.slice(0, MAX_PREVIEW_ITEMS_PER_COLUMN).map((item, itemIndex) => ({
+        id: item.id || itemIndex + 1,
+        color: item.color || columnColor,
+      })),
+    }
+  })
+}
 </script>
 
 <template>
   <section class="team-panel">
     <header class="team-panel-header">
-      <div>
+      <div class="team-panel-heading">
         <h2 class="team-panel-title">Ретро-доски команды</h2>
         <p v-if="team" class="team-panel-subtitle">{{ team.name }}</p>
       </div>
-      <label v-if="team && !isLoading && !error && boards.length > 0" class="boards-search-label">
-        <input
-          v-model="boardSearchQuery"
-          class="boards-search-input"
-          type="text"
-          maxlength="120"
-          placeholder="Введите название доски"
-        />
-      </label>
-      <div class="team-panel-actions">
-        <ReloadButton
-          :disabled="isLoading || !team"
-          :is-loading="isLoading"
-          @click="emit('reload')"
-        />
+      <div class="team-panel-controls">
+        <label v-if="team && !isLoading && !error && boards.length > 0" class="boards-search-label">
+          <input
+            v-model="boardSearchQuery"
+            class="boards-search-input"
+            type="text"
+            maxlength="120"
+            placeholder="Введите название доски"
+          />
+        </label>
+        <div class="team-panel-actions">
+          <ReloadButton
+            :disabled="isLoading || !team"
+            :is-loading="isLoading"
+            @click="emit('reload')"
+          />
+        </div>
       </div>
     </header>
 
@@ -182,6 +202,30 @@ const formatBoardDate = (value: string | null) => {
             <div class="board-item-main">
               <p class="board-item-title">{{ board.name }}</p>
               <p v-if="board.description" class="board-item-description">{{ board.description }}</p>
+            </div>
+            <div class="board-item-preview" aria-hidden="true">
+              <div v-if="board.columns.length > 0" class="board-item-preview-columns">
+                <div
+                  v-for="column in getBoardPreviewColumns(board)"
+                  :key="column.id"
+                  class="board-preview-column"
+                >
+                  <span class="board-preview-column-accent" :style="{ backgroundColor: column.color }" />
+                  <span
+                    v-for="item in column.items"
+                    :key="`${column.id}-${item.id}`"
+                    class="board-preview-card"
+                    :style="{ backgroundColor: item.color }"
+                  />
+                </div>
+              </div>
+              <div v-else class="board-preview-placeholder">
+                <span
+                  v-for="placeholderIndex in 3"
+                  :key="placeholderIndex"
+                  class="board-preview-placeholder-column"
+                />
+              </div>
             </div>
             <div class="board-item-side">
               <span v-if="board.date" class="board-item-date">{{
@@ -260,6 +304,20 @@ const formatBoardDate = (value: string | null) => {
   align-items: flex-start;
 }
 
+.team-panel-heading {
+  min-width: 0;
+}
+
+.team-panel-controls {
+  margin-left: auto;
+  min-width: 0;
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  justify-content: flex-end;
+  flex: 1 1 auto;
+}
+
 .team-panel-title {
   margin: 0;
   font-size: 20px;
@@ -273,10 +331,8 @@ const formatBoardDate = (value: string | null) => {
 
 .team-panel-actions {
   display: flex;
-  gap: 8px;
   align-items: center;
   flex-shrink: 0;
-  margin-left: auto;
 }
 
 .boards-search-label {
@@ -428,8 +484,9 @@ const formatBoardDate = (value: string | null) => {
   background: #fff;
   text-align: left;
   display: grid;
-  grid-template-rows: 1fr auto;
-  gap: 10px;
+  grid-template-rows: auto auto auto;
+  gap: 8px;
+  align-content: start;
   cursor: pointer;
 }
 
@@ -497,6 +554,57 @@ const formatBoardDate = (value: string | null) => {
   -webkit-line-clamp: 4;
   -webkit-box-orient: vertical;
   overflow: hidden;
+}
+
+.board-item-preview {
+  min-height: 84px;
+  border: 1px solid #dbe6f5;
+  border-radius: 8px;
+  background: #f6f9ff;
+  padding: 6px;
+  overflow: hidden;
+}
+
+.board-item-preview-columns {
+  height: 100%;
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: minmax(0, 1fr);
+  gap: 6px;
+}
+
+.board-preview-column {
+  border: 1px solid #d5e1f1;
+  border-radius: 6px;
+  background: #fff;
+  padding: 4px;
+  display: grid;
+  gap: 4px;
+  align-content: start;
+}
+
+.board-preview-column-accent {
+  display: block;
+  height: 4px;
+  border-radius: 999px;
+}
+
+.board-preview-card {
+  display: block;
+  height: 10px;
+  border-radius: 4px;
+}
+
+.board-preview-placeholder {
+  height: 100%;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 6px;
+}
+
+.board-preview-placeholder-column {
+  border-radius: 6px;
+  background: linear-gradient(180deg, #edf2fa 0%, #e5edf8 100%);
 }
 
 .board-item-side {
@@ -571,14 +679,14 @@ const formatBoardDate = (value: string | null) => {
     align-items: stretch;
   }
 
-  .team-panel-actions {
-    justify-content: flex-end;
+  .team-panel-controls {
+    width: 100%;
   }
 
   .boards-search-label {
     max-width: none;
     width: 100%;
-    flex: auto;
+    flex: 1 1 auto;
   }
 }
 
