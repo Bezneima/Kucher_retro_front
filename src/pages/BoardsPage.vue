@@ -35,6 +35,24 @@ const getApiErrorMessage = (error: unknown) => {
   return error.message || 'Не удалось загрузить список досок'
 }
 
+const getBoardTimestamp = (value: string) => {
+  if (!value) {
+    return Number.NEGATIVE_INFINITY
+  }
+
+  const timestamp = Date.parse(value)
+  return Number.isFinite(timestamp) ? timestamp : Number.NEGATIVE_INFINITY
+}
+
+const sortBoardsByDateDesc = (left: TBoard, right: TBoard) => {
+  const timestampDiff = getBoardTimestamp(right.date) - getBoardTimestamp(left.date)
+  if (timestampDiff !== 0) {
+    return timestampDiff
+  }
+
+  return right.id - left.id
+}
+
 const normalizeBoards = (rawBoards: unknown): TBoard[] => {
   if (!Array.isArray(rawBoards)) {
     return []
@@ -57,6 +75,7 @@ const normalizeBoards = (rawBoards: unknown): TBoard[] => {
       }
     })
     .filter((board): board is TBoard => Boolean(board))
+    .sort(sortBoardsByDateDesc)
 }
 
 const loadBoards = async () => {
@@ -174,7 +193,7 @@ onMounted(() => {
   padding: 0;
   list-style: none;
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 12px;
 }
 
@@ -184,6 +203,9 @@ onMounted(() => {
   border-radius: 12px;
   padding: 14px;
   cursor: pointer;
+  aspect-ratio: 1 / 1;
+  display: grid;
+  align-content: start;
   transition: border-color 0.2s ease, box-shadow 0.2s ease;
 }
 
@@ -197,6 +219,11 @@ onMounted(() => {
 .board-name {
   margin: 0;
   font-size: 18px;
+  line-height: 1.3;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
 }
 
 .board-date {
@@ -207,6 +234,10 @@ onMounted(() => {
 .board-description {
   margin: 8px 0 0;
   color: #415067;
+  display: -webkit-box;
+  -webkit-line-clamp: 5;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
 }
 
 .boards-error {
@@ -237,5 +268,28 @@ onMounted(() => {
 .boards-create:disabled {
   opacity: 0.65;
   cursor: not-allowed;
+}
+
+@media (max-width: 1200px) {
+  .boards-list {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 900px) {
+  .boards-list {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 560px) {
+  .boards-list {
+    grid-template-columns: 1fr;
+  }
+
+  .boards-item {
+    aspect-ratio: auto;
+    min-height: 148px;
+  }
 }
 </style>

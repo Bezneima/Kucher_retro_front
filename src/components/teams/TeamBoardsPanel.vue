@@ -26,14 +26,35 @@ const isCreateModalOpen = ref(false)
 const isCreateSubmitPending = ref(false)
 const boardSearchQuery = ref('')
 
-const filteredBoards = computed(() => {
-  const normalizedQuery = boardSearchQuery.value.trim().toLowerCase()
+const shouldShowCreateTile = computed(() => {
+  return props.canManage && boardSearchQuery.value.trim().length === 0
+})
 
-  if (!normalizedQuery) {
-    return props.boards
+const getBoardTimestamp = (value: string | null) => {
+  if (!value) {
+    return Number.NEGATIVE_INFINITY
   }
 
-  return props.boards.filter((board) => board.name.toLowerCase().includes(normalizedQuery))
+  const timestamp = Date.parse(value)
+  return Number.isFinite(timestamp) ? timestamp : Number.NEGATIVE_INFINITY
+}
+
+const sortBoardsByDateDesc = (left: RetroBoardSummary, right: RetroBoardSummary) => {
+  const timestampDiff = getBoardTimestamp(right.date) - getBoardTimestamp(left.date)
+  if (timestampDiff !== 0) {
+    return timestampDiff
+  }
+
+  return right.id - left.id
+}
+
+const filteredBoards = computed(() => {
+  const normalizedQuery = boardSearchQuery.value.trim().toLowerCase()
+  const boardsToRender = normalizedQuery
+    ? props.boards.filter((board) => board.name.toLowerCase().includes(normalizedQuery))
+    : props.boards
+
+  return [...boardsToRender].sort(sortBoardsByDateDesc)
 })
 
 const openCreateModal = () => {
@@ -116,15 +137,6 @@ const formatBoardDate = (value: string | null) => {
           :is-loading="isLoading"
           @click="emit('reload')"
         />
-        <button
-          v-if="canManage"
-          class="team-panel-create"
-          type="button"
-          :disabled="isCreating || !team"
-          @click="openCreateModal"
-        >
-          Создать
-        </button>
       </div>
     </header>
 
@@ -142,17 +154,29 @@ const formatBoardDate = (value: string | null) => {
         </p>
       </div>
 
-      <div v-else-if="boards.length === 0" class="state">
+      <div v-else-if="boards.length === 0 && !canManage" class="state">
         <p class="state-title">Досок пока нет</p>
         <p class="state-description">Создайте первую доску для выбранной команды.</p>
       </div>
 
-      <div v-else-if="filteredBoards.length === 0" class="state">
+      <div v-else-if="boards.length > 0 && filteredBoards.length === 0" class="state">
         <p class="state-title">Доска не найдена</p>
         <p class="state-description">Попробуйте изменить поисковый запрос.</p>
       </div>
 
       <ul v-else class="boards-list">
+        <li v-if="shouldShowCreateTile">
+          <button
+            class="board-item board-item--create"
+            type="button"
+            :disabled="isCreating || !team"
+            @click="openCreateModal"
+          >
+            <span class="board-create-plus">+</span>
+            <span class="board-create-label">Создать доску</span>
+          </button>
+        </li>
+
         <li v-for="board in filteredBoards" :key="board.id">
           <button class="board-item" type="button" @click="emit('openBoard', board.id)">
             <div class="board-item-main">
@@ -252,6 +276,7 @@ const formatBoardDate = (value: string | null) => {
   gap: 8px;
   align-items: center;
   flex-shrink: 0;
+  margin-left: auto;
 }
 
 .boards-search-label {
@@ -276,21 +301,6 @@ const formatBoardDate = (value: string | null) => {
   outline: none;
   border-color: #79a8e4;
   box-shadow: 0 0 0 3px rgba(121, 168, 228, 0.2);
-}
-
-.team-panel-create {
-  border: 0;
-  border-radius: 8px;
-  padding: 8px 12px;
-  background: #1e88e5;
-  color: #fff;
-  font-weight: 600;
-  cursor: pointer;
-}
-
-.team-panel-create:disabled {
-  opacity: 0.7;
-  cursor: not-allowed;
 }
 
 .board-form-label {
@@ -400,20 +410,26 @@ const formatBoardDate = (value: string | null) => {
   margin: 0;
   padding: 0;
   display: grid;
-  gap: 10px;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.boards-list > li {
+  min-width: 0;
 }
 
 .board-item {
   width: 100%;
+  height: 100%;
+  aspect-ratio: 1 / 1;
   border: 1px solid #dce8f7;
   border-radius: 10px;
   padding: 12px;
   background: #fff;
   text-align: left;
-  display: flex;
-  justify-content: space-between;
+  display: grid;
+  grid-template-rows: 1fr auto;
   gap: 10px;
-  align-items: center;
   cursor: pointer;
 }
 
@@ -422,29 +438,71 @@ const formatBoardDate = (value: string | null) => {
   box-shadow: 0 8px 20px rgba(45, 90, 150, 0.1);
 }
 
+.board-item--create {
+  border-style: dashed;
+  border-color: #c6ceda;
+  background: #eef1f5;
+  color: #4e5e74;
+  place-items: center;
+  place-content: center;
+  text-align: center;
+  gap: 6px;
+}
+
+.board-item--create:hover {
+  border-color: #aeb9c8;
+  box-shadow: 0 8px 20px rgba(84, 97, 118, 0.12);
+  background: #e8edf3;
+}
+
+.board-item--create:disabled {
+  opacity: 0.65;
+  cursor: not-allowed;
+}
+
+.board-create-plus {
+  font-size: 36px;
+  line-height: 1;
+  font-weight: 500;
+}
+
+.board-create-label {
+  font-size: 14px;
+  font-weight: 600;
+}
+
 .board-item-main {
   min-width: 0;
   display: grid;
   gap: 4px;
+  align-content: start;
 }
 
 .board-item-title {
   margin: 0;
   font-weight: 600;
   color: #1b2f4b;
+  line-height: 1.3;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
 }
 
 .board-item-description {
   margin: 0;
   color: #4a607f;
   font-size: 14px;
+  display: -webkit-box;
+  -webkit-line-clamp: 4;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
 }
 
 .board-item-side {
   display: grid;
-  justify-items: end;
+  justify-items: start;
   gap: 4px;
-  flex-shrink: 0;
 }
 
 .board-item-date {
@@ -522,14 +580,28 @@ const formatBoardDate = (value: string | null) => {
     width: 100%;
     flex: auto;
   }
+}
 
-  .board-item {
-    flex-direction: column;
-    align-items: flex-start;
+@media (max-width: 1200px) {
+  .boards-list {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 900px) {
+  .boards-list {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 560px) {
+  .boards-list {
+    grid-template-columns: 1fr;
   }
 
-  .board-item-side {
-    justify-items: start;
+  .board-item {
+    aspect-ratio: auto;
+    min-height: 148px;
   }
 }
 </style>
