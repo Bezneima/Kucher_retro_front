@@ -111,6 +111,7 @@ onBeforeUnmount(() => {
           >
             Сообщество телеграмм
           </button>
+          <div class="teams-user-dropdown-divider" />
           <button
             class="teams-user-dropdown-item"
             type="button"
@@ -224,5 +225,10 @@ onBeforeUnmount(() => {
 
 .teams-user-dropdown-item:hover {
   background: #eef4fe;
+}
+
+.teams-user-dropdown-divider {
+  margin: 0;
+  border-top: 1px solid #d5e2f4;
 }
 </style>

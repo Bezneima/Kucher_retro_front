@@ -40,14 +40,28 @@ export const setAuthSession = (params: {
   }
 }
 
+export const setAuthTokens = (params: {
+  accessToken: string
+  refreshToken?: string
+}) => {
+  localStorage.setItem(ACCESS_TOKEN_STORAGE_KEY, params.accessToken)
+
+  if (params.refreshToken !== undefined) {
+    if (params.refreshToken) {
+      localStorage.setItem(REFRESH_TOKEN_STORAGE_KEY, params.refreshToken)
+    } else {
+      localStorage.removeItem(REFRESH_TOKEN_STORAGE_KEY)
+    }
+  }
+}
+
 export const clearAuthSession = () => {
   localStorage.removeItem(ACCESS_TOKEN_STORAGE_KEY)
   localStorage.removeItem(REFRESH_TOKEN_STORAGE_KEY)
   localStorage.removeItem(USER_NAME_STORAGE_KEY)
+  localStorage.removeItem(USER_EMAIL_STORAGE_KEY)
 }
 
 export const getUserName = () => {
-  const name = localStorage.getItem(USER_NAME_STORAGE_KEY)
-  console.info(localStorage.getItem(USER_EMAIL_STORAGE_KEY))
   return localStorage.getItem(USER_NAME_STORAGE_KEY) ?? localStorage.getItem(USER_EMAIL_STORAGE_KEY)
 }

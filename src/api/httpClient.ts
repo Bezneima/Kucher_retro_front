@@ -1,5 +1,5 @@
 import axios, { AxiosError, AxiosHeaders } from 'axios'
-import { clearAuthSession, getAccessToken } from '@/auth/session'
+import { clearAuthSession, getAccessToken, getRefreshToken, setAuthTokens } from '@/auth/session'
 
 const RETRO_API_BASE_URL = import.meta.env.VITE_RETRO_API_BASE_URL?.trim() ?? ''
 
@@ -7,6 +7,65 @@ export const httpClient = axios.create({
   baseURL: RETRO_API_BASE_URL,
   timeout: 15000,
 })
+
+let refreshRequest: Promise<string | null> | null = null
+
+type RetriableRequestConfig = {
+  _retry?: boolean
+  url?: string
+}
+
+const shouldSkipRefresh = (url?: string) => {
+  if (!url) {
+    return false
+  }
+
+  return url.includes('/auth/login') || url.includes('/auth/register') || url.includes('/auth/refresh')
+}
+
+const refreshAccessToken = async (): Promise<string | null> => {
+  if (refreshRequest) {
+    return refreshRequest
+  }
+
+  refreshRequest = (async () => {
+    const refreshToken = getRefreshToken()
+    if (!refreshToken) {
+      return null
+    }
+
+    const response = await axios.post(
+      `${RETRO_API_BASE_URL}/auth/refresh`,
+      { refreshToken },
+      {
+        headers: {
+          'Content-Type': 'application/json',
+          Accept: 'application/json',
+        },
+        timeout: 15000,
+      },
+    )
+
+    const nextAccessToken =
+      typeof response.data?.accessToken === 'string' ? response.data.accessToken : null
+    if (!nextAccessToken) {
+      return null
+    }
+
+    setAuthTokens({
+      accessToken: nextAccessToken,
+      refreshToken: typeof response.data?.refreshToken === 'string' ? response.data.refreshToken : undefined,
+    })
+
+    return nextAccessToken
+  })()
+
+  try {
+    return await refreshRequest
+  } finally {
+    refreshRequest = null
+  }
+}
 
 httpClient.interceptors.request.use((config) => {
   const headers = AxiosHeaders.from(config.headers)
@@ -31,9 +90,32 @@ httpClient.interceptors.request.use((config) => {
 httpClient.interceptors.response.use(
   (response) => response,
   (error: AxiosError) => {
-    if (error.response?.status === 401 && typeof window !== 'undefined' && window.location.pathname !== '/auth') {
-      clearAuthSession()
-      window.location.assign('/auth')
+    const status = error.response?.status
+    const requestConfig = error.config as (typeof error.config & RetriableRequestConfig) | undefined
+
+    if (status === 401 && requestConfig && !requestConfig._retry && !shouldSkipRefresh(requestConfig.url)) {
+      requestConfig._retry = true
+
+      return refreshAccessToken()
+        .then((token) => {
+          if (!token) {
+            throw error
+          }
+
+          const headers = AxiosHeaders.from(requestConfig.headers)
+          headers.set('Authorization', `Bearer ${token}`)
+          requestConfig.headers = headers
+
+          return httpClient(requestConfig)
+        })
+        .catch((refreshError) => {
+          if (typeof window !== 'undefined' && window.location.pathname !== '/auth') {
+            clearAuthSession()
+            window.location.assign('/auth')
+          }
+
+          return Promise.reject(refreshError)
+        })
     }
 
     const method = error.config?.method?.toUpperCase() ?? 'UNKNOWN'
