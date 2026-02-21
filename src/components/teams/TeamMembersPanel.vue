@@ -71,7 +71,6 @@ const onMemberRoleChange = (event: Event, member: TeamMember) => {
     <header class="team-panel-header">
       <div>
         <h2 class="team-panel-title">Участники</h2>
-        <p v-if="team" class="team-panel-subtitle">{{ team.name }}</p>
       </div>
       <ReloadButton
         :disabled="isLoading || !team"
@@ -216,12 +215,6 @@ const onMemberRoleChange = (event: Event, member: TeamMember) => {
 .team-panel-title {
   margin: 0;
   font-size: 20px;
-}
-
-.team-panel-subtitle {
-  margin: 4px 0 0;
-  color: #4c607f;
-  font-size: 14px;
 }
 
 .member-form {

@@ -11,6 +11,7 @@ import type {
   TeamMember,
   TeamRole,
   TeamSummary,
+  UpdateTeamRequest,
   UpdateTeamMemberRoleRequest,
 } from '../types'
 
@@ -276,6 +277,21 @@ export const teamsApiClient = {
         .filter((team): team is TeamSummary => Boolean(team))
     } catch (error) {
       throw toTeamBoardsApiError(error, 'Не удалось загрузить команды')
+    }
+  },
+  async updateTeam(teamId: number, payload: UpdateTeamRequest): Promise<TeamSummary | null> {
+    try {
+      const response = await httpClient.patch(`/teams/${teamId}`, payload)
+      return normalizeTeam(response.data)
+    } catch (error) {
+      throw toTeamBoardsApiError(error, 'Не удалось обновить команду')
+    }
+  },
+  async leaveTeam(teamId: number): Promise<void> {
+    try {
+      await httpClient.delete(`/teams/${teamId}/leave`)
+    } catch (error) {
+      throw toTeamBoardsApiError(error, 'Не удалось покинуть команду')
     }
   },
   async getTeamMembers(teamId: number): Promise<TeamMember[]> {

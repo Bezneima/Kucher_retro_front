@@ -41,6 +41,10 @@ export type CreateTeamRequest = {
   name: string
 }
 
+export type UpdateTeamRequest = {
+  name: string
+}
+
 export type AddTeamMemberRequest = {
   email: string
   role?: TeamAdminRole

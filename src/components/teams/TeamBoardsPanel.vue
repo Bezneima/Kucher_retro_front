@@ -138,7 +138,6 @@ const getBoardPreviewColumns = (board: RetroBoardSummary) => {
     <header class="team-panel-header">
       <div class="team-panel-heading">
         <h2 class="team-panel-title">Ретро-доски команды</h2>
-        <p v-if="team" class="team-panel-subtitle">{{ team.name }}</p>
       </div>
       <div class="team-panel-controls">
         <label v-if="team && !isLoading && !error && boards.length > 0" class="boards-search-label">
@@ -321,12 +320,6 @@ const getBoardPreviewColumns = (board: RetroBoardSummary) => {
 .team-panel-title {
   margin: 0;
   font-size: 20px;
-}
-
-.team-panel-subtitle {
-  margin: 4px 0 0;
-  color: #4c607f;
-  font-size: 14px;
 }
 
 .team-panel-actions {

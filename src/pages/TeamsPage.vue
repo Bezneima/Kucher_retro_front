@@ -6,6 +6,7 @@ import GlobalHeader from '@/components/teams/GlobalHeader.vue'
 import NotificationStack from '@/components/teams/NotificationStack.vue'
 import TeamBoardsPanel from '@/components/teams/TeamBoardsPanel.vue'
 import TeamMembersPanel from '@/components/teams/TeamMembersPanel.vue'
+import TeamSettingsPanel from '@/components/teams/TeamSettingsPanel.vue'
 import TeamSidebar from '@/components/teams/TeamSidebar.vue'
 import { useTeamsDashboard } from '@/features/teams/composables/useTeamsDashboard'
 
@@ -97,6 +98,17 @@ watch(
       />
 
       <div class="teams-content">
+        <TeamSettingsPanel
+          :team="dashboard.selectedTeam.value"
+          :members-count="dashboard.members.value.length"
+          :boards-count="dashboard.boards.value.length"
+          :can-manage="dashboard.canManageSelectedTeam.value"
+          :is-renaming="dashboard.isTeamRenaming.value"
+          :is-leaving="dashboard.isTeamLeaving.value"
+          @rename="dashboard.renameTeam"
+          @leave="dashboard.leaveTeam"
+        />
+
         <TeamBoardsPanel
           :team="dashboard.selectedTeam.value"
           :boards="dashboard.boards.value"

@@ -69,6 +69,8 @@ export const useTeamsDashboard = () => {
   const isBoardsLoading = ref(false)
 
   const isTeamCreating = ref(false)
+  const isTeamRenaming = ref(false)
+  const isTeamLeaving = ref(false)
   const isMemberAdding = ref(false)
   const removingMemberId = ref<string | null>(null)
   const changingMemberRoleId = ref<string | null>(null)
@@ -293,6 +295,75 @@ export const useTeamsDashboard = () => {
     }
   }
 
+  const renameTeam = async (name: string) => {
+    const teamId = selectedTeamId.value
+    if (!teamId || !canManageSelectedTeam.value) {
+      return
+    }
+
+    const nextName = name.trim()
+    if (!nextName) {
+      pushNotification('error', 'Название команды пустое', 'Укажите новое название команды.')
+      return
+    }
+
+    const currentTeam = selectedTeam.value
+    if (currentTeam?.name === nextName) {
+      return
+    }
+
+    isTeamRenaming.value = true
+
+    try {
+      const updatedTeam = await teamsApiClient.updateTeam(teamId, { name: nextName })
+
+      teams.value = teams.value.map((team) => {
+        if (team.id !== teamId) {
+          return team
+        }
+
+        return {
+          ...team,
+          name: updatedTeam?.name ?? nextName,
+          role: updatedTeam?.role ?? team.role,
+        }
+      })
+
+      pushNotification('success', 'Команда обновлена', `Новое название: "${nextName}".`)
+    } catch (error) {
+      const uiError = toUiError(error, 'Не удалось обновить команду')
+      pushNotification('error', uiError.title, uiError.description)
+    } finally {
+      isTeamRenaming.value = false
+    }
+  }
+
+  const leaveTeam = async () => {
+    const teamId = selectedTeamId.value
+    const teamName = selectedTeam.value?.name
+    if (!teamId) {
+      return
+    }
+
+    isTeamLeaving.value = true
+
+    try {
+      await teamsApiClient.leaveTeam(teamId)
+      selectedTeamId.value = null
+      await loadTeams()
+      pushNotification(
+        'success',
+        'Вы покинули команду',
+        teamName ? `Вы больше не участник команды "${teamName}".` : undefined,
+      )
+    } catch (error) {
+      const uiError = toUiError(error, 'Не удалось покинуть команду')
+      pushNotification('error', uiError.title, uiError.description)
+    } finally {
+      isTeamLeaving.value = false
+    }
+  }
+
   const addMember = async () => {
     const teamId = selectedTeamId.value
     const email = addMemberEmail.value.trim()
@@ -452,10 +523,12 @@ export const useTeamsDashboard = () => {
     isMembersLoading,
     isBoardsLoading,
     isTeamCreating,
+    isTeamLeaving,
     isMemberAdding,
     removingMemberId,
     changingMemberRoleId,
     isBoardCreating,
+    isTeamRenaming,
     teamsError,
     membersError,
     boardsError,
@@ -469,6 +542,8 @@ export const useTeamsDashboard = () => {
     initialize,
     selectTeam,
     createTeam,
+    renameTeam,
+    leaveTeam,
     addMember,
     removeMember,
     updateMemberRole,
