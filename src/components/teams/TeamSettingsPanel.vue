@@ -126,14 +126,29 @@ const submitLeaveTeam = () => {
           aria-label="Переименовать команду"
           @click="openRenameModal"
         >
-          <img class="team-panel-edit-icon" :src="pencilIcon" alt="" />
+          <img
+            class="team-panel-edit-icon"
+            title="Переименовать команду"
+            :src="pencilIcon"
+            alt=""
+          />
         </button>
         <span class="team-panel-meta">
-          <img :src="usersIcon" alt="" aria-hidden="true" />
+          <img
+            :src="usersIcon"
+            title="Количество участников"
+            alt="Количество участников"
+            aria-hidden="true"
+          />
           {{ membersCount }}
         </span>
         <span class="team-panel-meta">
-          <img :src="dashboardIcon" alt="" aria-hidden="true" />
+          <img
+            :src="dashboardIcon"
+            title="Количество досок"
+            alt="Количество досок"
+            aria-hidden="true"
+          />
           {{ boardsCount }}
         </span>
       </div>
@@ -142,11 +157,12 @@ const submitLeaveTeam = () => {
         v-if="team"
         class="team-panel-leave"
         type="button"
+        title="Выйти из команды"
         :disabled="isLeaving || isRenaming"
         aria-label="Покинуть команду"
         @click="submitLeaveTeam"
       >
-        <img class="team-panel-leave-icon" :src="leaveIcon" alt="" />
+        <img class="team-panel-leave-icon" :src="leaveIcon" alt="Выйти из команды" />
       </button>
     </div>
   </section>
