@@ -69,6 +69,8 @@ export const normalizeColumns = (columnsData: unknown): TRetroColumn[] => {
       isNameEditing: false,
       items: itemsData.map((itemData, rowIndex) => {
         const rawItem = itemData as Partial<TRetroColumnItem>
+        const normalizedCommentsCount = Number(rawItem.commentsCount)
+
         return {
           id: Number(rawItem.id) || rowIndex + 1,
           description: typeof rawItem.description === 'string' ? rawItem.description : '',
@@ -78,6 +80,10 @@ export const normalizeColumns = (columnsData: unknown): TRetroColumn[] => {
           likes: Array.isArray(rawItem.likes)
             ? rawItem.likes.filter((like): like is string => typeof like === 'string')
             : [],
+          commentsCount:
+            Number.isInteger(normalizedCommentsCount) && normalizedCommentsCount >= 0
+              ? normalizedCommentsCount
+              : 0,
           color: typeof rawItem.color === 'string' ? rawItem.color : undefined,
           isDraft: false,
           columnIndex,

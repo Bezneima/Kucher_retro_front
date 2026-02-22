@@ -73,6 +73,7 @@ export const currentUserActions = {
       email: null,
       name: null,
     }
+    this.currentUserTeamRole = null
   },
   async ensureCurrentUserLoaded(this: TCurrentUserActionsContext) {
     if (!getAccessToken() || hasCurrentUserProfile(this)) return

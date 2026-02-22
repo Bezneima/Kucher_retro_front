@@ -30,6 +30,7 @@ export const itemActions = {
       description: 'Напишите описание нового элемента',
       syncedDescription: undefined,
       likes: [],
+      commentsCount: 0,
       isDraft: true,
       columnIndex,
       rowIndex: 0,
@@ -76,6 +77,7 @@ export const itemActions = {
         createdAt?: unknown
         columnIndex?: unknown
         rowIndex?: unknown
+        commentsCount?: unknown
       }
 
       if (typeof createdItem.id === 'number' && Number.isFinite(createdItem.id)) {
@@ -89,6 +91,10 @@ export const itemActions = {
       }
       if (Array.isArray(createdItem.likes)) {
         itemToUpdate.likes = createdItem.likes.filter((like): like is string => typeof like === 'string')
+      }
+      const createdCommentsCount = Number(createdItem.commentsCount)
+      if (Number.isInteger(createdCommentsCount) && createdCommentsCount >= 0) {
+        itemToUpdate.commentsCount = createdCommentsCount
       }
       if ('color' in createdItem) {
         itemToUpdate.color = typeof createdItem.color === 'string' ? createdItem.color : undefined
@@ -136,6 +142,18 @@ export const itemActions = {
 
       if (item.isDraft) return
       void httpClient.patch(`/retro/items/${itemId}/like`)
+      return
+    }
+  },
+  setItemCommentsCount(this: TItemActionsContext, itemId: number, commentsCount: number) {
+    const normalizedCommentsCount = Number(commentsCount)
+    if (!Number.isFinite(normalizedCommentsCount)) return
+
+    for (const column of getBoardColumns(this)) {
+      const item = column.items.find((i) => i.id === itemId)
+      if (!item) continue
+
+      item.commentsCount = Math.max(0, Math.floor(normalizedCommentsCount))
       return
     }
   },

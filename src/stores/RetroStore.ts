@@ -10,6 +10,7 @@ export type {
   TRetroColumn,
   TRetroBoard,
   TRetroCurrentUser,
+  TRetroUserBoardRole,
   TItemPositionChange,
   TRetroBoardState,
 } from './retro/types'

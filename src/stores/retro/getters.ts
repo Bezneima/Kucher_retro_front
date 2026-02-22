@@ -9,4 +9,5 @@ export const retroGetters = {
   getCurrentUserEmail: (state: TRetroBoardState) => state.currentUser.email ?? '',
   getCurrentUserName: (state: TRetroBoardState) =>
     state.currentUser.name ?? state.currentUser.email ?? '',
+  getCurrentUserTeamRole: (state: TRetroBoardState) => state.currentUserTeamRole,
 }

@@ -90,12 +90,12 @@
 .column {
   --column-bg: #f0f0f0;
   background-color: var(--column-bg);
-  width: calc(33.33% - 30px - 32px);
+  width: var(--board-column-width, calc(33.33% - 30px - 32px));
   border-radius: 20px;
   height: 100%;
   min-height: 0;
   overflow: hidden;
-  flex-shrink: 0;
+  flex: 0 0 var(--board-column-width, calc(33.33% - 30px - 32px));
   display: flex;
   flex-direction: column;
   padding: 16px;
@@ -254,7 +254,7 @@ const defaultColumnColor: TRetroColumnColor = {
 
 const options = {
   group: 'shared',
-  draggable: '.card-container:not(.card-container-is-editing)',
+  draggable: '.card-container:not(.card-container-is-editing):not(.card-container-comments-open)',
   animation: 150,
   swapThreshold: 0.65,
   emptyInsertThreshold: 20,

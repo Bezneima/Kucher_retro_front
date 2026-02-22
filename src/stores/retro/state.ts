@@ -8,6 +8,7 @@ export const createRetroState = (): TRetroBoardState => ({
     email: null,
     name: null,
   },
+  currentUserTeamRole: null,
   lastSyncedPositions: {},
   board: [],
 })

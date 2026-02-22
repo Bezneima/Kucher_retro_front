@@ -5,6 +5,7 @@ export type TRetroColumnItem = {
   syncedDescription?: string
   // users id who liked the item
   likes: string[]
+  commentsCount: number
   color?: string
   isDraft?: boolean
   columnIndex: number
@@ -40,6 +41,8 @@ export type TRetroCurrentUser = {
   name: string | null
 }
 
+export type TRetroUserBoardRole = 'OWNER' | 'ADMIN' | 'MEMBER'
+
 /** Элемент с изменившейся позицией для отправки на бек */
 export type TItemPositionChange = {
   item: TRetroColumnItem
@@ -60,6 +63,7 @@ export type TRetroBoardState = {
   isBoardLoading: boolean
   activeItemId: number | null
   currentUser: TRetroCurrentUser
+  currentUserTeamRole: TRetroUserBoardRole | null
   /** Позиции элементов на момент последней синхронизации с беком (или загрузки) */
   lastSyncedPositions: Record<number, { columnId: number; rowIndex: number }>
 }

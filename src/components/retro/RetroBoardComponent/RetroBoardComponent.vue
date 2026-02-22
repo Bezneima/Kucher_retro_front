@@ -3,6 +3,7 @@
     <Sortable
       :key="columnsSortableKey"
       class="board-columns"
+      :style="boardColumnsStyle"
       :list="columns"
       item-key="id"
       :options="columnSortableOptions"
@@ -35,18 +36,28 @@
 }
 
 .board-columns {
+  --columns-gap: 30px;
+  --visible-columns: 1;
+  --board-column-width: calc(
+    (100% - (var(--columns-gap) * (var(--visible-columns) - 1))) / var(--visible-columns)
+  );
   display: flex;
   flex-direction: row;
-  gap: 30px;
+  gap: var(--columns-gap);
   min-height: 0;
   flex: 0 0 100%;
 }
 
+.board-columns > .column,
+.board-columns > .board-add-column {
+  width: var(--board-column-width);
+  flex: 0 0 var(--board-column-width);
+  box-sizing: border-box;
+}
+
 .board-add-column {
-  width: calc(33.33% - 10px);
   height: 100%;
   min-height: 0;
-  flex-shrink: 0;
   border: 1px dashed currentColor;
   background-color: #f0f0f0;
   color: #222;
@@ -84,6 +95,11 @@ import RetroColumnComponent from '../RetroColumnComponent/RetroColumn.vue'
 const retroStore = useRetroStore()
 const columns = computed(() => retroStore.getBoardColumns)
 const columnsSortableKey = computed(() => columns.value.map((column) => column.id).join(','))
+const MAX_VISIBLE_COLUMNS = 6
+const boardColumnsStyle = computed(() => {
+  const visibleColumns = Math.min(Math.max(columns.value.length, 1), MAX_VISIBLE_COLUMNS)
+  return { '--visible-columns': String(visibleColumns) }
+})
 
 const columnSortableOptions = {
   handle: '.column-drag-handle',
