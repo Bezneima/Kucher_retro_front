@@ -23,7 +23,7 @@ const emit = defineEmits<{
 const isRenameModalOpen = ref(false)
 const nextTeamName = ref('')
 const submittedTeamName = ref('')
-const isOverlayMouseDown = ref(false)
+const isOverlayPointerDown = ref(false)
 
 const openRenameModal = () => {
   if (!props.team || !props.canManage) {
@@ -42,18 +42,19 @@ const closeRenameModal = () => {
 
   isRenameModalOpen.value = false
   submittedTeamName.value = ''
-  isOverlayMouseDown.value = false
+  isOverlayPointerDown.value = false
 }
 
-const onOverlayMouseDown = (event: MouseEvent) => {
-  isOverlayMouseDown.value = event.target === event.currentTarget
+const onOverlayPointerDown = (event: PointerEvent) => {
+  const isPrimaryPointer = event.pointerType !== 'mouse' || event.button === 0
+  isOverlayPointerDown.value = event.target === event.currentTarget && isPrimaryPointer
 }
 
-const onOverlayMouseUp = (event: MouseEvent) => {
+const onOverlayPointerUp = (event: PointerEvent) => {
   const shouldClose =
-    isOverlayMouseDown.value && event.target === event.currentTarget && !props.isRenaming
+    isOverlayPointerDown.value && event.target === event.currentTarget && !props.isRenaming
 
-  isOverlayMouseDown.value = false
+  isOverlayPointerDown.value = false
 
   if (!shouldClose) {
     return
@@ -170,8 +171,8 @@ const submitLeaveTeam = () => {
   <div
     v-if="isRenameModalOpen"
     class="team-modal-overlay"
-    @mousedown="onOverlayMouseDown"
-    @mouseup="onOverlayMouseUp"
+    @pointerdown="onOverlayPointerDown"
+    @pointerup="onOverlayPointerUp"
   >
     <div class="team-modal" role="dialog" aria-modal="true" aria-label="Переименовать команду">
       <button
@@ -386,6 +387,8 @@ const submitLeaveTeam = () => {
 }
 
 .team-form-input {
+  width: 100%;
+  box-sizing: border-box;
   border: 1px solid #cfdbec;
   border-radius: 8px;
   padding: 9px 10px;

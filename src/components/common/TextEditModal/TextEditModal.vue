@@ -1,12 +1,26 @@
 <template>
   <Teleport to="body">
-    <div v-if="isOpen" class="text-edit-modal" @click.self="emit('close')">
+    <div
+      v-if="isOpen"
+      class="text-edit-modal"
+      @pointerdown="onOverlayPointerDown"
+      @pointerup="onOverlayPointerUp"
+    >
       <div class="text-edit-modal__content" role="dialog" aria-modal="true" :aria-label="title">
         <h3 class="text-edit-modal__title">{{ title }}</h3>
         <textarea
+          v-if="multiline"
           ref="textareaRef"
           v-model="text"
-          class="text-edit-modal__textarea"
+          class="text-edit-modal__field text-edit-modal__field--textarea"
+          :placeholder="placeholder"
+        />
+        <input
+          v-else
+          ref="inputRef"
+          v-model="text"
+          class="text-edit-modal__field text-edit-modal__field--input"
+          type="text"
           :placeholder="placeholder"
         />
         <div class="text-edit-modal__actions">
@@ -33,6 +47,7 @@ const props = withDefaults(
     placeholder?: string
     confirmText?: string
     cancelText?: string
+    multiline?: boolean
   }>(),
   {
     value: '',
@@ -40,6 +55,7 @@ const props = withDefaults(
     placeholder: 'Введите текст',
     confirmText: 'Сохранить',
     cancelText: 'Отмена',
+    multiline: true,
   },
 )
 
@@ -49,7 +65,22 @@ const emit = defineEmits<{
 }>()
 
 const textareaRef = ref<HTMLTextAreaElement | null>(null)
+const inputRef = ref<HTMLInputElement | null>(null)
 const text = ref('')
+const isOverlayPointerDown = ref(false)
+
+const onOverlayPointerDown = (event: PointerEvent) => {
+  const isPrimaryPointer = event.pointerType !== 'mouse' || event.button === 0
+  isOverlayPointerDown.value = event.target === event.currentTarget && isPrimaryPointer
+}
+
+const onOverlayPointerUp = (event: PointerEvent) => {
+  const shouldClose = isOverlayPointerDown.value && event.target === event.currentTarget
+  isOverlayPointerDown.value = false
+  if (shouldClose) {
+    emit('close')
+  }
+}
 
 const onConfirm = () => {
   emit('confirm', text.value.trim())
@@ -75,10 +106,15 @@ watch(
       text.value = props.value ?? ''
       document.addEventListener('keydown', onDocumentKeydown)
       await nextTick()
-      textareaRef.value?.focus()
+      if (props.multiline) {
+        textareaRef.value?.focus()
+      } else {
+        inputRef.value?.focus()
+      }
       return
     }
 
+    isOverlayPointerDown.value = false
     document.removeEventListener('keydown', onDocumentKeydown)
   },
   { immediate: true },
@@ -93,75 +129,87 @@ onBeforeUnmount(() => {
 .text-edit-modal {
   position: fixed;
   inset: 0;
-  z-index: 1100;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: rgb(0 0 0 / 45%);
+  z-index: 1200;
+  display: grid;
+  place-items: center;
+  background: rgba(13, 24, 46, 0.45);
   padding: 16px;
 }
 
 .text-edit-modal__content {
-  width: min(100%, 480px);
-  border-radius: 4px;
+  width: min(500px, 100%);
+  border: 1px solid #d9e4f2;
+  border-radius: 14px;
   background: #fff;
-  color: #181818;
-  padding: 16px;
-  box-shadow: 0 10px 30px rgb(0 0 0 / 25%);
+  padding: 18px;
 }
 
 .text-edit-modal__title {
-  margin: 0;
-  font-size: 16px;
+  margin: 0 30px 14px 0;
+  font-size: 18px;
   font-weight: 600;
+  color: #33445f;
 }
 
-.text-edit-modal__textarea {
-  margin-top: 10px;
+.text-edit-modal__field {
+  margin-top: 0;
   width: 100%;
-  min-height: 120px;
-  padding: 8px 10px;
-  border: 1px solid #d0d0d0;
-  border-radius: 2px;
-  resize: vertical;
+  box-sizing: border-box;
   font-size: 14px;
   line-height: 1.45;
-  color: #181818;
+  color: #33445f;
 }
 
-.text-edit-modal__textarea:focus {
-  outline: 1px solid #777;
+.text-edit-modal__field--textarea {
+  min-height: 120px;
+  padding: 9px 10px;
+  border: 1px solid #cfdbec;
+  border-radius: 8px;
+  resize: vertical;
+}
+
+.text-edit-modal__field--input {
+  min-height: 0;
+  padding: 9px 10px;
+  border: 1px solid #cfdbec;
+  border-radius: 8px;
+}
+
+.text-edit-modal__field:focus {
+  outline: none;
+  border-color: #79a8e4;
+  box-shadow: 0 0 0 3px rgba(121, 168, 228, 0.2);
 }
 
 .text-edit-modal__actions {
-  margin-top: 16px;
+  margin-top: 12px;
   display: flex;
   justify-content: flex-end;
-  gap: 8px;
+  gap: 10px;
 }
 
 .text-edit-modal__button {
-  border: 1px solid #d0d0d0;
+  border: 1px solid #cfdbec;
   background: #fff;
-  color: #181818;
-  border-radius: 2px;
-  padding: 6px 12px;
+  color: #33445f;
+  border-radius: 8px;
+  padding: 10px 12px;
   font-size: 14px;
   cursor: pointer;
 }
 
 .text-edit-modal__button:hover {
-  border-color: #777;
+  border-color: #79a8e4;
 }
 
 .text-edit-modal__button-primary {
-  border-color: #2d6cdf;
-  background: #2d6cdf;
+  border: 0;
+  background: #1e88e5;
   color: #fff;
+  font-weight: 600;
 }
 
 .text-edit-modal__button-primary:hover {
-  border-color: #1f56b9;
-  background: #1f56b9;
+  background: #1878c9;
 }
 </style>

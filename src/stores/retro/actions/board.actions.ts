@@ -193,4 +193,32 @@ export const boardActions = {
       this.isBoardLoading = false
     }
   },
+  async updateBoardName(this: any, boardId: number, name: string) {
+    const normalizedName = name.trim()
+    if (!normalizedName) {
+      return
+    }
+
+    try {
+      const response = await httpClient.patch(`/retro/boards/${boardId}/name`, {
+        name: normalizedName,
+      })
+
+      const responseName = isRecord(response.data) && typeof response.data.name === 'string'
+        ? response.data.name.trim()
+        : ''
+      const nextBoardName = responseName || normalizedName
+
+      const currentBoard = this.board[0]
+      if (!currentBoard || Number(currentBoard.id) !== boardId) {
+        return
+      }
+
+      currentBoard.name = nextBoardName
+      this.board = [{ ...currentBoard }]
+    } catch (error) {
+      console.error('[retro] failed to update board name', boardId, error)
+      throw error
+    }
+  },
 }

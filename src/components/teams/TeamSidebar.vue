@@ -22,6 +22,7 @@ const emit = defineEmits<{
 const isCreateModalOpen = ref(false)
 const isCreateSubmitPending = ref(false)
 const teamSearchQuery = ref('')
+const isOverlayPointerDown = ref(false)
 
 const filteredTeams = computed(() => {
   const normalizedQuery = teamSearchQuery.value.trim().toLowerCase()
@@ -44,6 +45,23 @@ const closeCreateModal = () => {
 
   isCreateModalOpen.value = false
   isCreateSubmitPending.value = false
+  isOverlayPointerDown.value = false
+}
+
+const onOverlayPointerDown = (event: PointerEvent) => {
+  const isPrimaryPointer = event.pointerType !== 'mouse' || event.button === 0
+  isOverlayPointerDown.value = event.target === event.currentTarget && isPrimaryPointer
+}
+
+const onOverlayPointerUp = (event: PointerEvent) => {
+  const shouldClose = isOverlayPointerDown.value && event.target === event.currentTarget
+  isOverlayPointerDown.value = false
+
+  if (!shouldClose) {
+    return
+  }
+
+  closeCreateModal()
 }
 
 const submitCreateTeam = () => {
@@ -145,7 +163,12 @@ watch(
       </ul>
     </section>
 
-    <div v-if="isCreateModalOpen" class="team-modal-overlay" @click.self="closeCreateModal">
+    <div
+      v-if="isCreateModalOpen"
+      class="team-modal-overlay"
+      @pointerdown="onOverlayPointerDown"
+      @pointerup="onOverlayPointerUp"
+    >
       <div class="team-modal" role="dialog" aria-modal="true" aria-label="Создать команду">
         <button
           class="team-modal-close"
@@ -373,40 +396,45 @@ watch(
 .team-modal-overlay {
   position: fixed;
   inset: 0;
-  background: rgba(18, 28, 45, 0.48);
+  background: rgba(13, 24, 46, 0.45);
   display: grid;
   place-items: center;
-  padding: 20px;
+  padding: 16px;
   z-index: 1200;
 }
 
 .team-modal {
-  position: relative;
-  width: min(440px, 100%);
-  background: #fff;
+  width: min(500px, 100%);
+  border: 1px solid #d9e4f2;
   border-radius: 14px;
-  border: 1px solid #d5e1f2;
-  box-shadow: 0 16px 30px rgba(20, 40, 72, 0.2);
-  padding: 16px;
-  display: grid;
-  gap: 12px;
+  background: #fff;
+  padding: 18px;
+  position: relative;
 }
 
 .team-modal-close {
   position: absolute;
   top: 8px;
   right: 8px;
+  width: 34px;
+  height: 34px;
   border: 0;
-  background: transparent;
-  color: #50627f;
+  border-radius: 8px;
+  background: #eff5ff;
+  color: #1a4f8d;
   font-size: 24px;
   line-height: 1;
   cursor: pointer;
 }
 
+.team-modal-close:disabled {
+  opacity: 0.7;
+  cursor: not-allowed;
+}
+
 .team-modal-title {
-  margin: 0;
-  font-size: 20px;
+  margin: 0 30px 14px 0;
+  font-size: 18px;
 }
 
 .state {

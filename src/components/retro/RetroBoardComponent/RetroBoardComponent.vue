@@ -46,6 +46,7 @@
   gap: var(--columns-gap);
   min-height: 0;
   flex: 0 0 100%;
+  padding-bottom: 30px;
 }
 
 .board-columns > .column,

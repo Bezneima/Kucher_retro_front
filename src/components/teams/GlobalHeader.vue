@@ -6,11 +6,15 @@ import SvgIcon from '@/components/common/SvgIcon/SvgIcon.vue'
 
 const props = defineProps<{
   userName: string
+  centerTitle?: string
+  canEditCenterTitle?: boolean
+  fullWidth?: boolean
 }>()
 
 const emit = defineEmits<{
   profile: []
   logout: []
+  'edit-center-title': []
 }>()
 
 const isMenuOpen = ref(false)
@@ -80,10 +84,25 @@ onBeforeUnmount(() => {
 
 <template>
   <header class="teams-top-strip">
-    <div class="teams-top-strip-inner">
+    <div class="teams-top-strip-inner" :class="{ 'teams-top-strip-inner-full-width': props.fullWidth }">
       <RouterLink class="teams-top-strip-logo-link" to="/teams" aria-label="Перейти к командам">
         <img class="teams-top-strip-logo" :src="logoSrc" alt="Logo" />
       </RouterLink>
+
+      <div v-if="props.centerTitle" class="teams-top-strip-center-title" :title="props.centerTitle">
+        <span class="teams-top-strip-center-title-text">
+          {{ props.centerTitle }}
+        </span>
+        <button
+          v-if="props.canEditCenterTitle"
+          class="teams-top-strip-center-title-edit"
+          type="button"
+          aria-label="Редактировать название доски"
+          @click="emit('edit-center-title')"
+        >
+          <SvgIcon name="pencile" class="teams-top-strip-center-title-edit-icon" />
+        </button>
+      </div>
 
       <div ref="menuRootRef" class="teams-user-menu">
         <button class="teams-user-name" type="button" @click="onProfileClick">
@@ -152,6 +171,11 @@ onBeforeUnmount(() => {
   box-sizing: border-box;
   display: flex;
   align-items: center;
+  position: relative;
+}
+
+.teams-top-strip-inner-full-width {
+  max-width: none;
 }
 
 .teams-top-strip-logo {
@@ -170,6 +194,47 @@ onBeforeUnmount(() => {
   align-items: center;
   gap: 8px;
   margin-left: auto;
+}
+
+.teams-top-strip-center-title {
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
+  max-width: min(70vw, 620px);
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.teams-top-strip-center-title-text {
+  max-width: min(60vw, 520px);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-size: 16px;
+  font-weight: 700;
+  color: #2f4261;
+}
+
+.teams-top-strip-center-title-edit {
+  border: none;
+  background: transparent;
+  padding: 0;
+  margin: 0;
+  color: #516b93;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.teams-top-strip-center-title-edit:hover {
+  color: #2f4261;
+}
+
+.teams-top-strip-center-title-edit-icon {
+  width: 14px;
+  height: 14px;
 }
 
 .teams-user-name {

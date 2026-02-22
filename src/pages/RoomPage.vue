@@ -1,6 +1,14 @@
 <template>
   <main class="room-page">
-    <GlobalHeader :user-name="userName" @profile="openProfile" @logout="logout" />
+    <GlobalHeader
+      :user-name="userName"
+      :center-title="boardTitle"
+      :can-edit-center-title="canEditBoardName"
+      full-width
+      @profile="openProfile"
+      @logout="logout"
+      @edit-center-title="openBoardNameEditModal"
+    />
 
     <section class="room-content">
       <div class="columns">
@@ -8,6 +16,18 @@
         <RetroBoardComponent v-else />
       </div>
     </section>
+
+    <TextEditModal
+      :is-open="isBoardNameEditModalOpen"
+      :value="boardTitle"
+      :multiline="false"
+      title="Изменить название доски"
+      placeholder="Введите название доски"
+      confirm-text="Сохранить"
+      cancel-text="Отмена"
+      @close="closeBoardNameEditModal"
+      @confirm="submitBoardNameEdit"
+    />
   </main>
 </template>
 
@@ -44,9 +64,10 @@
 </style>
 
 <script setup lang="ts">
-import { computed, onMounted } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { clearAuthSession } from '@/auth/session'
+import TextEditModal from '@/components/common/TextEditModal/TextEditModal.vue'
 import GlobalHeader from '@/components/teams/GlobalHeader.vue'
 import RetroBoardComponent from '../components/retro/RetroBoardComponent/RetroBoardComponent.vue'
 import Loader from '../components/common/Loader/Loader.vue'
@@ -56,6 +77,14 @@ const retroStore = useRetroStore()
 const route = useRoute()
 const router = useRouter()
 const userName = computed(() => retroStore.getCurrentUserName || 'Пользователь')
+const boardTitle = computed(() => retroStore.getBoard[0]?.name ?? '')
+const currentBoardId = computed(() => retroStore.getBoard[0]?.id ?? null)
+const currentUserRole = computed(() => retroStore.getCurrentUserTeamRole)
+const canEditBoardName = computed(() => {
+  return currentUserRole.value === 'OWNER' || currentUserRole.value === 'ADMIN'
+})
+const isBoardNameEditModalOpen = ref(false)
+const isBoardNameUpdating = ref(false)
 
 const openProfile = async () => {
   await router.push({ name: 'profile' })
@@ -65,6 +94,39 @@ const logout = async () => {
   retroStore.clearCurrentUser()
   clearAuthSession()
   await router.replace({ name: 'auth' })
+}
+
+const openBoardNameEditModal = () => {
+  if (!canEditBoardName.value || !boardTitle.value) {
+    return
+  }
+
+  isBoardNameEditModalOpen.value = true
+}
+
+const closeBoardNameEditModal = () => {
+  isBoardNameEditModalOpen.value = false
+}
+
+const submitBoardNameEdit = async (nextBoardName: string) => {
+  const boardId = currentBoardId.value
+  const normalizedName = nextBoardName.trim()
+  const currentName = boardTitle.value.trim()
+
+  if (!boardId || !normalizedName || normalizedName === currentName || isBoardNameUpdating.value) {
+    closeBoardNameEditModal()
+    return
+  }
+
+  isBoardNameUpdating.value = true
+  try {
+    await retroStore.updateBoardName(boardId, normalizedName)
+    closeBoardNameEditModal()
+  } catch (error) {
+    console.error('[room] failed to rename board', error)
+  } finally {
+    isBoardNameUpdating.value = false
+  }
 }
 
 onMounted(() => {

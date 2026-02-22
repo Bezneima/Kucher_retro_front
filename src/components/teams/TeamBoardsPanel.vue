@@ -25,6 +25,7 @@ const emit = defineEmits<{
 const isCreateModalOpen = ref(false)
 const isCreateSubmitPending = ref(false)
 const boardSearchQuery = ref('')
+const isOverlayPointerDown = ref(false)
 const MAX_PREVIEW_COLUMNS = 5
 const MAX_PREVIEW_ITEMS_PER_COLUMN = 5
 const DEFAULT_PREVIEW_COLUMN_COLOR = '#d7dfeb'
@@ -71,6 +72,23 @@ const closeCreateModal = () => {
 
   isCreateModalOpen.value = false
   isCreateSubmitPending.value = false
+  isOverlayPointerDown.value = false
+}
+
+const onOverlayPointerDown = (event: PointerEvent) => {
+  const isPrimaryPointer = event.pointerType !== 'mouse' || event.button === 0
+  isOverlayPointerDown.value = event.target === event.currentTarget && isPrimaryPointer
+}
+
+const onOverlayPointerUp = (event: PointerEvent) => {
+  const shouldClose = isOverlayPointerDown.value && event.target === event.currentTarget
+  isOverlayPointerDown.value = false
+
+  if (!shouldClose) {
+    return
+  }
+
+  closeCreateModal()
 }
 
 const submitCreateBoard = () => {
@@ -243,7 +261,12 @@ const getBoardPreviewColumns = (board: RetroBoardSummary) => {
       </ul>
     </template>
 
-    <div v-if="isCreateModalOpen" class="board-modal-overlay" @click.self="closeCreateModal">
+    <div
+      v-if="isCreateModalOpen"
+      class="board-modal-overlay"
+      @pointerdown="onOverlayPointerDown"
+      @pointerup="onOverlayPointerUp"
+    >
       <div class="board-modal" role="dialog" aria-modal="true" aria-label="Создать доску">
         <button
           class="board-modal-close"
@@ -370,6 +393,8 @@ const getBoardPreviewColumns = (board: RetroBoardSummary) => {
 }
 
 .board-form-input {
+  width: 100%;
+  box-sizing: border-box;
   border: 1px solid #cfdbec;
   border-radius: 8px;
   padding: 9px 10px;
