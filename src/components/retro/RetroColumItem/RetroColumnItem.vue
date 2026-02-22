@@ -98,7 +98,7 @@
               class="card-comments-submit-button"
               :disabled="isCreateCommentPending || !canCreateComment"
             >
-              {{ isCreateCommentPending ? 'Отправка...' : 'Добавить комментарий' }}
+              {{ isCreateCommentPending ? 'Отправка...' : 'Отправить' }}
             </button>
           </form>
 
@@ -305,7 +305,7 @@
 
 .card-footer-date {
   line-height: 1;
-  font-weight: 500;
+  font-weight: 300;
   opacity: 0.95;
 }
 
@@ -631,7 +631,6 @@ const formattedCreatedAt = computed(() => {
   return parsedDate.toLocaleDateString('ru-RU', {
     day: '2-digit',
     month: '2-digit',
-    year: 'numeric',
   })
 })
 

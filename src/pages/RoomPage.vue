@@ -9,6 +9,7 @@
       @logout="logout"
       @edit-center-title="openBoardNameEditModal"
     />
+    <BoardSettingsComponent />
 
     <section class="room-content">
       <div class="columns">
@@ -61,6 +62,10 @@
 :deep(.columns > .board) {
   height: 100%;
 }
+
+:deep(.teams-top-strip) {
+  margin-bottom: 0;
+}
 </style>
 
 <script setup lang="ts">
@@ -69,6 +74,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { clearAuthSession } from '@/auth/session'
 import TextEditModal from '@/components/common/TextEditModal/TextEditModal.vue'
 import GlobalHeader from '@/components/teams/GlobalHeader.vue'
+import BoardSettingsComponent from '@/components/retro/BoardSettingsComponent/BoardSettingsComponent.vue'
 import RetroBoardComponent from '../components/retro/RetroBoardComponent/RetroBoardComponent.vue'
 import Loader from '../components/common/Loader/Loader.vue'
 import { useRetroStore } from '../stores/RetroStore'

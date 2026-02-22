@@ -62,6 +62,7 @@ export type TRetroBoardState = {
   board: TRetroBoard[]
   isBoardLoading: boolean
   activeItemId: number | null
+  cardSearchQuery: string
   currentUser: TRetroCurrentUser
   currentUserTeamRole: TRetroUserBoardRole | null
   /** Позиции элементов на момент последней синхронизации с беком (или загрузки) */

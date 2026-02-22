@@ -55,6 +55,7 @@
       </button>
     </div>
     <Sortable
+      v-if="!isCardFilterActive"
       :key="sortableKey"
       class="sortable-container"
       :list="column?.items ?? []"
@@ -68,6 +69,13 @@
         <RetroColumnItem :element="element" />
       </template>
     </Sortable>
+    <div v-else class="sortable-container">
+      <RetroColumnItem
+        v-for="element in filteredItems"
+        :key="element.id"
+        :element="element"
+      />
+    </div>
     <ConfirmDeleteModal
       :is-open="isDeleteColumnModalOpen"
       title="Удалить колонку?"
@@ -246,6 +254,8 @@ const isDeleteColumnModalOpen = ref(false)
 const isEditDescriptionModalOpen = ref(false)
 const descriptionDraft = ref('')
 const sortableKey = computed(() => `${column.id}:${column.items.map((item) => item.id).join(',')}`)
+const isCardFilterActive = computed(() => retroStore.getHasCardSearchQuery)
+const filteredItems = computed(() => retroStore.getFilteredColumnItems(column.id))
 const defaultColumnColor: TRetroColumnColor = {
   columnColor: '#f0f0f0',
   itemColor: '#f0f0f0',

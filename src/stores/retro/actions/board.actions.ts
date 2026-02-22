@@ -105,6 +105,9 @@ const resolveCurrentUserBoardRole = async (boardPayload: unknown): Promise<TRetr
 }
 
 export const boardActions = {
+  setCardSearchQuery(this: any, query: string) {
+    this.cardSearchQuery = typeof query === 'string' ? query : ''
+  },
   normalizeColumns(this: any, columnsData: unknown) {
     return normalizeColumns(columnsData)
   },

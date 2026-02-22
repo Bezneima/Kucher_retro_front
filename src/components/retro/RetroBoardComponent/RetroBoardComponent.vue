@@ -24,7 +24,6 @@
 
 <style>
 .board {
-  margin-top: 20px;
   height: 100%;
   min-height: 0;
   display: flex;
