@@ -7,7 +7,7 @@
     :style="itemStyle"
   >
     <div ref="menuButtonRef" class="open-menu-button" @click="onMenuButtonClick">
-      <SvgIcon name="menu" class="open-menu-button-icon" />
+      <SvgIcon name="cardMenuIcon" class="open-menu-button-icon" />
     </div>
     <RetroColumnItemMenu
       :is-open="isMenuOpen"
@@ -20,30 +20,35 @@
       @delete-card="onDeleteCardClick"
       :cardColor="element.color"
     />
+    <div v-if="!isEditing" class="item-text-preview" @click="startEditingOnTextAreaClick">
+      {{ editText || ' ' }}
+    </div>
     <textarea
+      v-else
       ref="textareaRef"
       v-model="editText"
-      :class="[
-        'item-textarea',
-        { 'item-textarea-isEditing': isEditing, 'item-textarea-isNotEditing': !isEditing },
-      ]"
-      @click="startEditingOnTextAreaClick"
+      class="item-textarea item-textarea-isEditing"
+      @click.stop
       @input="onDescriptionInput"
       @keydown.enter.exact.prevent="saveAndClose"
       @keydown.escape="cancelEditing"
     />
     <div :class="['card-footer', { 'card-footer-edited': isEditing }]" @click="onFooterClick">
       <template v-if="!isEditing">
-        <button
-          :class="['card-footer-button', { 'card-footer-button-liked': isLikedByMe }]"
-          @click="onLikeButtonClick"
-        >
-          <SvgIcon name="like" class="card-footer-button-icon" />
-        </button>
-        <span @click="onLikeButtonClick" class="card-footer-button-likes-count"
-          >{{ element.likes.length }}
-        </span>
-        <span>{{ element.id }}</span>
+        <span v-if="formattedCreatedAt" class="card-footer-date">{{ formattedCreatedAt }}</span>
+        <div class="card-footer-like-container" @click="onLikeButtonClick">
+          <button :class="['card-footer-button', { 'card-footer-button-liked': isLikedByMe }]">
+            <SvgIcon v-if="isLikedByMe" name="filledLike" class="card-footer-button-icon" />
+            <SvgIcon v-else name="like" class="card-footer-button-icon" />
+          </button>
+          <span
+            :class="[
+              'card-footer-button-likes-count',
+              { 'card-footer-button-likes-count-liked': isLikedByMe },
+            ]"
+            >{{ element.likes.length }}
+          </span>
+        </div>
       </template>
     </div>
     <ConfirmDeleteModal
@@ -59,31 +64,32 @@
 <style scoped>
 .card-container {
   position: relative;
-  margin: 10px 0;
+  margin-top: 16px;
   background-color: var(--item-bg, #f0f0f0);
   font-size: 13px;
   font-weight: 400;
   line-height: 1.4;
-  border-radius: 2px;
+  border-radius: 10px;
+  overflow: hidden;
   cursor: grab;
-  border: 1px solid transparent;
+  border: 2px solid transparent;
+  box-sizing: border-box;
 }
 
 .card-container:hover {
-  border: 1px solid color-mix(in srgb, var(--item-bg, #f0f0f0) 80%, black);
-  border-radius: 2px;
+  border: 2px solid color-mix(in srgb, var(--item-bg, #f0f0f0) 80%, black);
 }
 
 .item-textarea {
   display: block;
   width: calc(100% - 20px);
   min-height: 0;
-  padding: 10px;
+  padding: 8px 10px;
   border: none;
   background-color: var(--item-bg, #f0f0f0);
-  font-size: inherit;
-  font-family: inherit;
-  line-height: inherit;
+  font-size: 14px;
+  font-family: 'Roboto', sans-serif;
+  line-height: 1.4;
   resize: none;
   outline: none;
   field-sizing: content;
@@ -91,8 +97,20 @@
   color: white;
 }
 
-.item-textarea-isNotEditing {
+.item-text-preview {
+  width: calc(100% - 20px);
+  min-height: 20px;
+  padding: 8px 10px;
+  background-color: var(--item-bg, #f0f0f0);
+  font-size: 14px;
+  font-family: 'Roboto', sans-serif;
+  line-height: 1.4;
+  color: white;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
   cursor: grab !important;
+  user-select: none;
+  -webkit-user-select: none;
 }
 
 .item-textarea-isEditing {
@@ -105,10 +123,10 @@
   display: flex;
   align-items: center;
   gap: 4px;
-  justify-content: flex-end;
-  height: 14px;
+  justify-content: space-between;
+  min-height: 18px;
   background-color: var(--item-bg, #f0f0f0);
-  padding: 0px 8px 4px 0px;
+  padding: 0 8px 4px;
   color: white;
   font-size: 12px;
   border-bottom-left-radius: 2px;
@@ -120,8 +138,8 @@
 }
 
 .card-footer-button {
-  width: 14px;
-  height: 14px;
+  width: 16px;
+  height: 16px;
   padding: 0;
   border: none;
   cursor: pointer;
@@ -129,34 +147,52 @@
   background: transparent;
   .card-footer-button-icon {
     width: 100%;
-    height: 100%;
     display: block;
   }
 }
 .card-footer-button-liked {
-  color: black;
+  color: white;
+}
+
+.card-footer-date {
+  line-height: 1;
+  font-weight: 500;
+  opacity: 0.95;
+}
+
+.card-footer-like-container {
+  display: flex;
+  align-items: center;
+  cursor: pointer;
+  gap: 2px;
 }
 
 .card-footer-button-likes-count {
-  transform: translateY(2px);
+  transform: translateY(1px);
   font-weight: 500;
   cursor: pointer;
 }
+
+.card-footer-button-likes-count-liked {
+  color: white;
+  font-weight: 600;
+}
+
 .open-menu-button {
   position: absolute;
-  top: 4px;
-  right: 2px;
-  width: 10px;
-  height: 10px;
-  /* background-color: black; */
+  top: 6px;
+  right: 4px;
+  width: 14px;
+  height: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   cursor: pointer;
-  color: #333;
   border-radius: 4px;
-  padding: 2px;
 
   .open-menu-button-icon {
-    width: 100%;
-    height: 100%;
+    width: 12px;
+    height: 12px;
     color: white;
     display: block;
   }
@@ -169,7 +205,8 @@
 
 <style>
 .sortable-chosen {
-  border: 1px solid color-mix(in srgb, var(--item-bg, #f0f0f0) 60%, black) !important;
+  cursor: grabbing !important;
+  border: 2px solid color-mix(in srgb, var(--item-bg, #f0f0f0) 60%, black) !important;
 }
 </style>
 
@@ -179,7 +216,7 @@ import ConfirmDeleteModal from '@/components/common/ConfirmDeleteModal/ConfirmDe
 import RetroColumnItemMenu from './RetroColumnItemMenu.vue'
 import { ref, watch, nextTick, onMounted, onUnmounted, computed } from 'vue'
 import type { TRetroColumnItem } from '../../../stores/RetroStore'
-import { RETRO_USER_ID, useRetroStore } from '../../../stores/RetroStore'
+import { useRetroStore } from '../../../stores/RetroStore'
 
 const retroStore = useRetroStore()
 const props = defineProps<{
@@ -194,7 +231,22 @@ const textareaRef = ref<HTMLTextAreaElement | null>(null)
 const menuButtonRef = ref<HTMLElement | null>(null)
 const isDeleteCardModalOpen = ref(false)
 
-const isLikedByMe = computed(() => props.element.likes.includes(RETRO_USER_ID))
+const currentUserLikeId = computed(() => retroStore.getCurrentUserId)
+const isLikedByMe = computed(() => {
+  if (!currentUserLikeId.value) return false
+  return props.element.likes.includes(currentUserLikeId.value)
+})
+const formattedCreatedAt = computed(() => {
+  if (!props.element.createdAt) return ''
+  const parsedDate = new Date(props.element.createdAt)
+  if (!Number.isFinite(parsedDate.getTime())) return ''
+
+  return parsedDate.toLocaleDateString('ru-RU', {
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+  })
+})
 const itemStyle = computed(() => (props.element.color ? { '--item-bg': props.element.color } : {}))
 
 watch(

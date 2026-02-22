@@ -6,6 +6,7 @@ import type {
   CreateRetroBoardRequest,
   CreateTeamRequest,
   RetroBoardSummary,
+  RetroBoardSummaryColumnColor,
   RetroBoardSummaryColumn,
   RetroBoardSummaryItem,
   TeamMember,
@@ -75,6 +76,38 @@ const getNestedRecord = (record: TRecord, key: string): TRecord | undefined => {
 }
 
 const DEFAULT_PREVIEW_COLUMN_COLOR = '#d7dfeb'
+const DEFAULT_PREVIEW_COLUMN_COLOR_SET: RetroBoardSummaryColumnColor = {
+  columnColor: DEFAULT_PREVIEW_COLUMN_COLOR,
+  itemColor: DEFAULT_PREVIEW_COLUMN_COLOR,
+  buttonColor: DEFAULT_PREVIEW_COLUMN_COLOR,
+}
+
+const normalizeBoardColumnColor = (payload: unknown): RetroBoardSummaryColumnColor => {
+  if (typeof payload === 'string') {
+    const normalized = payload.trim()
+    if (!normalized) return { ...DEFAULT_PREVIEW_COLUMN_COLOR_SET }
+
+    return {
+      columnColor: normalized,
+      itemColor: normalized,
+      buttonColor: normalized,
+    }
+  }
+
+  if (!isRecord(payload)) {
+    return { ...DEFAULT_PREVIEW_COLUMN_COLOR_SET }
+  }
+
+  const columnColor = asString(payload.columnColor)?.trim() || DEFAULT_PREVIEW_COLUMN_COLOR
+  const itemColor = asString(payload.itemColor)?.trim() || columnColor
+  const buttonColor = asString(payload.buttonColor)?.trim() || columnColor
+
+  return {
+    columnColor,
+    itemColor,
+    buttonColor,
+  }
+}
 
 const normalizeBoardItem = (payload: unknown, fallbackId: number): RetroBoardSummaryItem | null => {
   if (!isRecord(payload)) {
@@ -115,7 +148,7 @@ const normalizeBoardColumn = (payload: unknown, fallbackId: number): RetroBoardS
   }
 
   const id = asPositiveNumber(payload.id) ?? fallbackId
-  const color = asString(payload.color)?.trim() ?? DEFAULT_PREVIEW_COLUMN_COLOR
+  const color = normalizeBoardColumnColor(payload.color)
   const itemsPayload = Array.isArray(payload.items) ? payload.items : []
   const items = itemsPayload
     .map((item, itemIndex) => normalizeBoardItem(item, itemIndex + 1))

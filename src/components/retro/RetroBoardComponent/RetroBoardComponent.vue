@@ -22,6 +22,7 @@
 
 <style>
 .board {
+  margin-top: 20px;
   height: 100%;
   min-height: 0;
   display: flex;
@@ -35,7 +36,7 @@
 .board-columns {
   display: flex;
   flex-direction: row;
-  gap: 10px;
+  gap: 30px;
   min-height: 0;
   flex: 0 0 100%;
 }
@@ -45,8 +46,8 @@
   height: 100%;
   min-height: 0;
   flex-shrink: 0;
-  border: 1px dashed #c8c8c8;
-  background-color: #f6f6f6;
+  border: 1px dashed currentColor;
+  background-color: #f0f0f0;
   color: #222;
   cursor: pointer;
   display: flex;
@@ -58,8 +59,9 @@
 }
 
 .board-add-column:hover {
-  border-color: #9a9a9a;
-  background-color: #ececec;
+  color: #111;
+  border-color: currentColor;
+  background-color: #f0f0f0;
 }
 
 .board-add-column__plus {

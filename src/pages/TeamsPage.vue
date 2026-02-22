@@ -1,7 +1,7 @@
 <script setup lang="ts">
-import { onMounted, ref, watch } from 'vue'
+import { computed, onMounted, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { clearAuthSession, getUserName } from '@/auth/session'
+import { clearAuthSession } from '@/auth/session'
 import GlobalHeader from '@/components/teams/GlobalHeader.vue'
 import NotificationStack from '@/components/teams/NotificationStack.vue'
 import TeamBoardsPanel from '@/components/teams/TeamBoardsPanel.vue'
@@ -9,11 +9,13 @@ import TeamMembersPanel from '@/components/teams/TeamMembersPanel.vue'
 import TeamSettingsPanel from '@/components/teams/TeamSettingsPanel.vue'
 import TeamSidebar from '@/components/teams/TeamSidebar.vue'
 import { useTeamsDashboard } from '@/features/teams/composables/useTeamsDashboard'
+import { useRetroStore } from '@/stores/RetroStore'
 
 const route = useRoute()
 const router = useRouter()
 const dashboard = useTeamsDashboard()
-const userName = ref(getUserName() || '')
+const retroStore = useRetroStore()
+const userName = computed(() => retroStore.getCurrentUserName || 'Пользователь')
 
 const parseTeamIdQueryParam = (value: unknown): number | undefined => {
   const rawValue = Array.isArray(value) ? value[0] : value
@@ -49,6 +51,7 @@ const openProfile = async () => {
 }
 
 const logout = async () => {
+  retroStore.clearCurrentUser()
   clearAuthSession()
   await router.replace({ name: 'auth' })
 }

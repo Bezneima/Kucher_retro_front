@@ -20,15 +20,16 @@
         @remove-color="onRemoveColorClick"
         @delete-column="onDeleteColumnClick"
       />
-      <RetroColumnItemMenuColors v-else @back="closeColorMenu" @select-color="onColorClick" />
+      <RetroColumnMenuColors v-else @back="closeColorMenu" @select-color="onColorClick" />
     </div>
   </Teleport>
 </template>
 
 <script setup lang="ts">
 import { nextTick, onBeforeUnmount, ref, watch } from 'vue'
-import RetroColumnItemMenuColors from '@/components/retro/RetroColumItem/RetroColumnItemMenuColors.vue'
 import RetroColumnMenuActions from './RetroColumnMenuActions.vue'
+import RetroColumnMenuColors from './RetroColumnMenuColors.vue'
+import type { TRetroColumnColor } from '@/stores/RetroStore'
 
 const props = defineProps<{
   isOpen: boolean
@@ -41,7 +42,7 @@ const emit = defineEmits<{
   editColumn: []
   editDescription: []
   copyName: []
-  setColor: [color: string]
+  setColor: [color: TRetroColumnColor]
   removeColor: []
   deleteColumn: []
 }>()
@@ -123,7 +124,7 @@ const closeColorMenu = () => {
   isColorMenuOpen.value = false
 }
 
-const onColorClick = (color: string) => {
+const onColorClick = (color: TRetroColumnColor) => {
   emit('setColor', color)
   emit('close')
 }

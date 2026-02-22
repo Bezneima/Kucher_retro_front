@@ -1,6 +1,5 @@
 import { toRaw } from 'vue'
 import { httpClient } from '@/api/httpClient'
-import { RETRO_USER_ID } from '../constants'
 import { getBoardColumns } from '../helpers/selectors'
 import type { TRetroBoardState, TRetroColumnItem } from '../types'
 
@@ -9,6 +8,7 @@ type TItemActionsContext = TRetroBoardState & {
   syncAllItemIndices: (shouldSyncWithBackend?: boolean) => Promise<void>
   setActiveItemId: (itemId: number | null) => void
   setLastSyncedPositions: () => void
+  getCurrentUserId: string
 }
 
 export const itemActions = {
@@ -73,6 +73,7 @@ export const itemActions = {
         description,
       })
       const createdItem = (createResponse.data ?? {}) as Partial<TRetroColumnItem> & {
+        createdAt?: unknown
         columnIndex?: unknown
         rowIndex?: unknown
       }
@@ -82,6 +83,9 @@ export const itemActions = {
       }
       if (typeof createdItem.description === 'string') {
         itemToUpdate.description = createdItem.description
+      }
+      if (typeof createdItem.createdAt === 'string') {
+        itemToUpdate.createdAt = createdItem.createdAt
       }
       if (Array.isArray(createdItem.likes)) {
         itemToUpdate.likes = createdItem.likes.filter((like): like is string => typeof like === 'string')
@@ -111,21 +115,23 @@ export const itemActions = {
     void httpClient.patch(`/retro/items/${itemId}/description`, { description })
     console.info(toRaw(this.board))
   },
-  updateItemLike(this: TItemActionsContext, itemId: number, userId = RETRO_USER_ID) {
+  updateItemLike(this: TItemActionsContext, itemId: number, userId?: string | null) {
+    const currentUserId = userId ?? this.getCurrentUserId
+
     for (const column of getBoardColumns(this)) {
       const item = column.items.find((i) => i.id === itemId)
 
       if (!item) continue
 
-      const likes = item.likes
-      const index = likes.indexOf(userId)
+      if (currentUserId) {
+        const likes = item.likes
+        const index = likes.indexOf(currentUserId)
 
-      if (index === -1) {
-        // add like
-        likes.push(userId)
-      } else {
-        // remove like
-        likes.splice(index, 1)
+        if (index === -1) {
+          likes.push(currentUserId)
+        } else {
+          likes.splice(index, 1)
+        }
       }
 
       if (item.isDraft) return

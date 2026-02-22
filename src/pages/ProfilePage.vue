@@ -1,18 +1,20 @@
 <script setup lang="ts">
 import { AxiosError } from 'axios'
-import { computed, reactive, ref } from 'vue'
+import { computed, reactive, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { httpClient } from '@/api/httpClient'
-import { clearAuthSession, getUserEmail, getUserName, setUserName } from '@/auth/session'
+import { clearAuthSession } from '@/auth/session'
 import GlobalHeader from '@/components/teams/GlobalHeader.vue'
+import { useRetroStore } from '@/stores/RetroStore'
 
 type ProfileTab = 'profile' | 'subscription'
 
 const router = useRouter()
+const retroStore = useRetroStore()
 const activeTab = ref<ProfileTab>('profile')
-const initialUserName = ref(getUserName() || '')
-const userName = ref(initialUserName.value || 'Пользователь')
-const email = computed(() => getUserEmail() || 'Не указан')
+const initialUserName = ref(retroStore.getCurrentUserName || '')
+const userName = computed(() => retroStore.getCurrentUserName || 'Пользователь')
+const email = computed(() => retroStore.getCurrentUserEmail || 'Не указан')
 const isSaving = ref(false)
 const saveMessage = ref('')
 const saveError = ref('')
@@ -24,6 +26,22 @@ const form = reactive({
   name: initialUserName.value,
 })
 
+watch(
+  () => retroStore.getCurrentUserName,
+  (nextName) => {
+    if (!nextName) return
+
+    if (!initialUserName.value) {
+      initialUserName.value = nextName
+    }
+
+    if (!form.name.trim()) {
+      form.name = nextName
+    }
+  },
+  { immediate: true },
+)
+
 const openProfile = async () => {
   activeTab.value = 'profile'
   if (router.currentRoute.value.name !== 'profile') {
@@ -32,6 +50,7 @@ const openProfile = async () => {
 }
 
 const logout = async () => {
+  retroStore.clearCurrentUser()
   clearAuthSession()
   await router.replace({ name: 'auth' })
 }
@@ -98,9 +117,8 @@ const saveProfile = async () => {
 
     if (isNameChanged) {
       await httpClient.patch('/auth/me', { name: nextName })
-      setUserName(nextName)
+      retroStore.setCurrentUser({ name: nextName })
       initialUserName.value = nextName
-      userName.value = nextName
     }
 
     form.oldPassword = ''

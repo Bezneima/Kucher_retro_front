@@ -119,14 +119,15 @@ const formatBoardDate = (value: string | null) => {
 
 const getBoardPreviewColumns = (board: RetroBoardSummary) => {
   return board.columns.slice(0, MAX_PREVIEW_COLUMNS).map((column, columnIndex) => {
-    const columnColor = column.color || DEFAULT_PREVIEW_COLUMN_COLOR
+    const columnColor = column.color.columnColor || DEFAULT_PREVIEW_COLUMN_COLOR
+    const itemColor = column.color.itemColor || columnColor
 
     return {
       id: column.id || columnIndex + 1,
       color: columnColor,
       items: column.items.slice(0, MAX_PREVIEW_ITEMS_PER_COLUMN).map((item, itemIndex) => ({
         id: item.id || itemIndex + 1,
-        color: item.color || columnColor,
+        color: item.color || itemColor,
       })),
     }
   })
@@ -199,8 +200,10 @@ const getBoardPreviewColumns = (board: RetroBoardSummary) => {
         <li v-for="board in filteredBoards" :key="board.id">
           <button class="board-item" type="button" @click="emit('openBoard', board.id)">
             <div class="board-item-main">
-              <p class="board-item-title">{{ board.name }}</p>
-              <p v-if="board.description" class="board-item-description">{{ board.description }}</p>
+              <p class="board-item-title" :title="board.name">{{ board.name }}</p>
+              <p v-if="board.description" class="board-item-description" :title="board.description">
+                {{ board.description }}
+              </p>
             </div>
             <div class="board-item-preview" aria-hidden="true">
               <div v-if="board.columns.length > 0" class="board-item-preview-columns">
@@ -209,7 +212,10 @@ const getBoardPreviewColumns = (board: RetroBoardSummary) => {
                   :key="column.id"
                   class="board-preview-column"
                 >
-                  <span class="board-preview-column-accent" :style="{ backgroundColor: column.color }" />
+                  <span
+                    class="board-preview-column-accent"
+                    :style="{ backgroundColor: column.color }"
+                  />
                   <span
                     v-for="item in column.items"
                     :key="`${column.id}-${item.id}`"
@@ -537,6 +543,8 @@ const getBoardPreviewColumns = (board: RetroBoardSummary) => {
   -webkit-line-clamp: 2;
   -webkit-box-orient: vertical;
   overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .board-item-description {
@@ -547,6 +555,8 @@ const getBoardPreviewColumns = (board: RetroBoardSummary) => {
   -webkit-line-clamp: 4;
   -webkit-box-orient: vertical;
   overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .board-item-preview {

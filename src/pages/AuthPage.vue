@@ -4,10 +4,12 @@ import { useRouter } from 'vue-router'
 import { AxiosError } from 'axios'
 import { httpClient } from '@/api/httpClient'
 import { getAccessToken, setAuthSession } from '@/auth/session'
+import { useRetroStore } from '@/stores/RetroStore'
 
 type AuthMode = 'login' | 'register'
 
 const router = useRouter()
+const retroStore = useRetroStore()
 const mode = ref<AuthMode>('login')
 const isSubmitting = ref(false)
 const errorMessage = ref('')
@@ -20,6 +22,8 @@ const form = reactive({
 
 if (getAccessToken()) {
   void router.replace('/teams')
+} else {
+  retroStore.clearCurrentUser()
 }
 
 const isRegisterMode = computed(() => mode.value === 'register')
@@ -63,6 +67,7 @@ const submit = async () => {
     }
 
     setAuthSession(response.data)
+    retroStore.clearCurrentUser()
     await router.replace('/teams')
   } catch (error) {
     errorMessage.value = getApiErrorMessage(error)

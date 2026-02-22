@@ -30,10 +30,16 @@ export type RetroBoardSummaryItem = {
   rowIndex?: number
 }
 
+export type RetroBoardSummaryColumnColor = {
+  columnColor: string
+  itemColor: string
+  buttonColor: string
+}
+
 export type RetroBoardSummaryColumn = {
   id: number
   name: string
-  color: string
+  color: RetroBoardSummaryColumnColor
   items: RetroBoardSummaryItem[]
 }
 

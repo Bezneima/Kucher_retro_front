@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { onBeforeUnmount, ref, watch } from 'vue'
+import { RouterLink } from 'vue-router'
 import logoSrc from '@/assets/img/logo.png'
 import SvgIcon from '@/components/common/SvgIcon/SvgIcon.vue'
 
@@ -80,7 +81,9 @@ onBeforeUnmount(() => {
 <template>
   <header class="teams-top-strip">
     <div class="teams-top-strip-inner">
-      <img class="teams-top-strip-logo" :src="logoSrc" alt="Logo" />
+      <RouterLink class="teams-top-strip-logo-link" to="/teams" aria-label="Перейти к командам">
+        <img class="teams-top-strip-logo" :src="logoSrc" alt="Logo" />
+      </RouterLink>
 
       <div ref="menuRootRef" class="teams-user-menu">
         <button class="teams-user-name" type="button" @click="onProfileClick">
@@ -155,6 +158,10 @@ onBeforeUnmount(() => {
   height: 40px;
   width: auto;
   display: block;
+}
+
+.teams-top-strip-logo-link {
+  display: inline-flex;
 }
 
 .teams-user-menu {

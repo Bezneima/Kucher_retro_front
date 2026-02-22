@@ -1,5 +1,6 @@
 import { createRouter, createWebHistory } from 'vue-router'
 import { getAccessToken } from '@/auth/session'
+import { ensureCurrentUserLoaded } from '@/auth/currentUser'
 import AuthPage from '../pages/AuthPage.vue'
 import RoomPage from '../pages/RoomPage.vue'
 import TeamsPage from '../pages/TeamsPage.vue'
@@ -39,7 +40,11 @@ const router = createRouter({
   ],
 })
 
-router.beforeEach((to) => {
+router.beforeEach(async (to) => {
+  if (getAccessToken()) {
+    await ensureCurrentUserLoaded()
+  }
+
   const hasAccessToken = Boolean(getAccessToken())
 
   if (to.name !== 'auth' && !hasAccessToken) {

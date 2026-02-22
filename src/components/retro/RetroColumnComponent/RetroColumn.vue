@@ -1,5 +1,12 @@
 <template>
-  <div class="column" :style="{ '--column-bg': column.color, '--item-bg': column.color }">
+  <div
+    class="column"
+    :style="{
+      '--column-bg': column.color.columnColor,
+      '--item-bg': column.color.itemColor,
+      '--button-bg': column.color.buttonColor,
+    }"
+  >
     <div class="column-top">
       <div ref="columnHeaderRef" class="column-header" @click="onColumnHeaderClick">
         <span
@@ -7,8 +14,19 @@
           title="Перетащите для изменения порядка колонки"
           @click.stop
         >
-          <img src="@/assets/icons/svg/menu.svg" alt="" class="column-drag-handle__icon" />
+          <img src="@/assets/icons/svg/moveColumn.svg" alt="" class="column-drag-handle__icon" />
         </span>
+
+        <span
+          ref="menuButtonRef"
+          class="column-open-menu-button"
+          type="button"
+          @click="onMenuButtonClick"
+        >
+          <img src="@/assets/icons/svg/columnMenu.svg" alt="" class="column-drag-handle__icon" />
+        </span>
+      </div>
+      <div class="column-header__title-container">
         <span v-if="!column.isNameEditing" class="column-header__title">{{ column.name }}</span>
         <input
           v-else
@@ -18,20 +36,12 @@
           :value="column.name"
           @input="onNameInput"
         />
-        <button
-          ref="menuButtonRef"
-          class="column-open-menu-button"
-          type="button"
-          @click="onMenuButtonClick"
-        >
-          <SvgIcon name="menu" class="column-open-menu-button__icon" />
-        </button>
       </div>
       <div v-if="column.description" class="column-description">{{ column.description }}</div>
       <RetroColumnMenu
         :is-open="isMenuOpen"
         :anchor-el="menuButtonRef"
-        :column-color="column.color"
+        :column-color="column.color.columnColor"
         @close="closeMenu"
         @edit-column="onEditColumnClick"
         @edit-description="onEditDescriptionClick"
@@ -40,7 +50,9 @@
         @remove-color="onRemoveColumnColor"
         @delete-column="onDeleteColumn"
       />
-      <button class="column-add-button" @click="onAddItemClick">+</button>
+      <button class="column-add-button" type="button" @click="onAddItemClick">
+        <SvgIcon name="bigplus" class="column-add-button__icon" />
+      </button>
     </div>
     <Sortable
       :key="sortableKey"
@@ -77,37 +89,41 @@
 <style>
 .column {
   --column-bg: #f0f0f0;
-  width: calc(33.33% - 10px);
+  background-color: var(--column-bg);
+  width: calc(33.33% - 30px - 32px);
+  border-radius: 20px;
   height: 100%;
   min-height: 0;
   overflow: hidden;
   flex-shrink: 0;
   display: flex;
   flex-direction: column;
+  padding: 16px;
 }
 
 .column-top {
   display: flex;
   flex-direction: column;
   align-items: stretch;
-  gap: 8px;
-  padding: 6px 4px;
+}
+
+.column-header__title-container {
+  margin-top: 16px;
 }
 
 .column-header {
   flex: 1;
   display: flex;
   align-items: center;
-  gap: 6px;
-  padding: 8px;
-  font-weight: 500;
-  font-size: 16px;
-  border-radius: 2px;
+  justify-content: space-between;
 }
 
 .column-header__title {
-  flex: 1;
-  min-width: 0;
+  font-family: 'Roboto', sans-serif;
+  font-size: 18px;
+  font-weight: 500;
+  line-height: 1.4;
+  color: #000000a8;
 }
 
 .column-header__name-input {
@@ -120,19 +136,19 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 4px;
   cursor: grab;
-  border-radius: 2px;
-  color: #666;
+  padding: 4px;
+  border-radius: 4px;
+  transform: translateX(-4px);
 }
 
 .column-drag-handle:active {
   cursor: grabbing;
+  border: 0;
 }
 
 .column-drag-handle:hover {
   background-color: color-mix(in srgb, var(--column-bg) 80%, black);
-  color: #181818;
 }
 
 .column-drag-handle__icon {
@@ -142,21 +158,15 @@
 }
 
 .column-open-menu-button {
-  margin-left: auto;
-  width: 20px;
-  height: 20px;
-  padding: 3px;
-  border: none;
-  background: transparent;
-  border-radius: 2px;
+  width: 16px;
+  height: 16px;
+  padding: 4px;
+  border-radius: 4px;
   cursor: pointer;
-  color: #666;
-  flex-shrink: 0;
 }
 
 .column-open-menu-button:hover {
   background-color: color-mix(in srgb, var(--column-bg) 80%, black);
-  color: #181818;
 }
 
 .column-open-menu-button__icon {
@@ -166,30 +176,38 @@
 }
 
 .column-add-button {
+  margin-top: 16px;
   width: 100%;
-  min-height: 38px;
-  border: 1px solid transparent;
-  background-color: #f0f0f0;
-  color: #181818;
-  border-radius: 0;
+  height: 47px;
+  border: 3px dashed var(--button-bg);
+  border-radius: 10px;
+  background-color: transparent;
+  color: var(--button-bg);
   cursor: pointer;
-  font-size: 14px;
-  line-height: 1.4;
-  font-weight: 600;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .column-add-button:hover {
-  border: 1px solid color-mix(in srgb, var(--column-bg) 80%, black);
+  border: 3px dashed color-mix(in srgb, var(--button-bg) 80%, black);
+  color: color-mix(in srgb, var(--button-bg) 80%, black);
+}
+
+.column-add-button__icon {
+  width: 24px !important;
+  height: 24px !important;
+  stroke-width: 5px !important;
+  display: block;
 }
 
 .column-description {
-  min-height: 20px;
-  padding: 0 8px;
   font-size: 13px;
-  line-height: 1.4;
-  color: #4d4d4d;
+  font-weight: 400;
+  letter-spacing: 0;
+  color: #333;
   white-space: pre-wrap;
-  overflow-wrap: anywhere;
+  margin-top: 6px;
 }
 
 .sortable-container {
@@ -206,7 +224,7 @@
 <script setup lang="ts">
 import { ref, watch, onBeforeUnmount, nextTick, computed } from 'vue'
 import { Sortable } from 'sortablejs-vue3'
-import { type TRetroColumn } from '@/stores/RetroStore'
+import { type TRetroColumn, type TRetroColumnColor } from '@/stores/RetroStore'
 import SvgIcon from '@/components/common/SvgIcon/SvgIcon.vue'
 import ConfirmDeleteModal from '@/components/common/ConfirmDeleteModal/ConfirmDeleteModal.vue'
 import TextEditModal from '@/components/common/TextEditModal/TextEditModal.vue'
@@ -228,7 +246,11 @@ const isDeleteColumnModalOpen = ref(false)
 const isEditDescriptionModalOpen = ref(false)
 const descriptionDraft = ref('')
 const sortableKey = computed(() => `${column.id}:${column.items.map((item) => item.id).join(',')}`)
-const defaultColumnColor = '#f0f0f0'
+const defaultColumnColor: TRetroColumnColor = {
+  columnColor: '#f0f0f0',
+  itemColor: '#f0f0f0',
+  buttonColor: '#f0f0f0',
+}
 
 const options = {
   group: 'shared',
@@ -307,7 +329,7 @@ const onCopyNameClick = async () => {
   }
 }
 
-const onSetColumnColor = (color: string) => {
+const onSetColumnColor = (color: TRetroColumnColor) => {
   retroStore.updateColumnColor(column.id, color)
 }
 
@@ -336,7 +358,7 @@ const onNameInput = (event: Event) => {
 }
 
 const onColumnChoose = (event: any) => {
-  console.log('choose', event.item.id)
+  // console.log('choose', event.item.id)
 }
 
 const onColumnAdd = (event: any) => {

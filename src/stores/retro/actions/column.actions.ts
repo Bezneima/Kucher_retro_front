@@ -1,6 +1,42 @@
 import { httpClient } from '@/api/httpClient'
-import { goodCardColors } from '../constants'
+import { availableColors, goodCardColors } from '../constants'
 import { findColumnById, getBoardColumns, getBoardId } from '../helpers/selectors'
+import type { TRetroColumnColor } from '../types'
+
+const normalizeColumnColorPayload = (payload: unknown, fallback: TRetroColumnColor): TRetroColumnColor => {
+  if (typeof payload === 'string') {
+    const normalized = payload.trim()
+    if (!normalized) return fallback
+
+    return {
+      columnColor: normalized,
+      itemColor: normalized,
+      buttonColor: normalized,
+    }
+  }
+
+  if (typeof payload !== 'object' || payload === null) {
+    return fallback
+  }
+
+  const raw = payload as Partial<TRetroColumnColor>
+  const columnColor =
+    typeof raw.columnColor === 'string' && raw.columnColor.trim()
+      ? raw.columnColor
+      : fallback.columnColor
+  const itemColor =
+    typeof raw.itemColor === 'string' && raw.itemColor.trim() ? raw.itemColor : columnColor
+  const buttonColor =
+    typeof raw.buttonColor === 'string' && raw.buttonColor.trim()
+      ? raw.buttonColor
+      : fallback.buttonColor
+
+  return {
+    columnColor,
+    itemColor,
+    buttonColor,
+  }
+}
 
 export const columnActions = {
   updateColumnNameStart(this: any, columnId: number) {
@@ -37,7 +73,7 @@ export const columnActions = {
       void httpClient.patch(`/retro/columns/${columnId}/name`, { name: column.name })
     }
   },
-  updateColumnColor(this: any, columnId: number, color: string) {
+  updateColumnColor(this: any, columnId: number, color: TRetroColumnColor) {
     const column = findColumnById(this, columnId)
     if (!column) return
 
@@ -89,11 +125,19 @@ export const columnActions = {
     if (!boardId) return
 
     const nextColumnNumber = columns.length + 1
+    const fallbackColor =
+      availableColors[(nextColumnNumber - 1) % availableColors.length] ??
+      ({
+        columnColor: goodCardColors[(nextColumnNumber - 1) % goodCardColors.length] ?? '#f0f0f0',
+        itemColor: goodCardColors[(nextColumnNumber - 1) % goodCardColors.length] ?? '#f0f0f0',
+        buttonColor: goodCardColors[(nextColumnNumber - 1) % goodCardColors.length] ?? '#f0f0f0',
+      } satisfies TRetroColumnColor)
+
     const createdColumn = {
       id: Date.now() + nextColumnNumber,
       name: `Column ${nextColumnNumber}`,
       description: '',
-      color: goodCardColors[(nextColumnNumber - 1) % goodCardColors.length] ?? '#f0f0f0',
+      color: { ...fallbackColor },
       isNameEditing: false,
       items: [],
     }
@@ -121,9 +165,7 @@ export const columnActions = {
         if (typeof payload.name === 'string' && payload.name) {
           createdColumn.name = payload.name
         }
-        if (typeof payload.color === 'string' && payload.color) {
-          createdColumn.color = payload.color
-        }
+        createdColumn.color = normalizeColumnColorPayload(payload.color, createdColumn.color)
         if (typeof payload.description === 'string') {
           createdColumn.description = payload.description
         }
