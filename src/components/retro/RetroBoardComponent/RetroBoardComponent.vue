@@ -1,6 +1,7 @@
 <template>
   <div class="board">
     <Sortable
+      :key="columnsSortableKey"
       class="board-columns"
       :list="columns"
       item-key="id"
@@ -82,6 +83,7 @@ import RetroColumnComponent from '../RetroColumnComponent/RetroColumn.vue'
 
 const retroStore = useRetroStore()
 const columns = computed(() => retroStore.getBoardColumns)
+const columnsSortableKey = computed(() => columns.value.map((column) => column.id).join(','))
 
 const columnSortableOptions = {
   handle: '.column-drag-handle',
@@ -90,6 +92,8 @@ const columnSortableOptions = {
 }
 
 const onColumnsReorderEnd = (evt) => {
+  if (typeof evt.oldIndex !== 'number' || typeof evt.newIndex !== 'number') return
+  if (evt.oldIndex === evt.newIndex) return
   retroStore.reorderColumns(evt.oldIndex, evt.newIndex)
 }
 

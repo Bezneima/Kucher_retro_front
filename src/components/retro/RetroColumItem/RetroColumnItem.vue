@@ -100,7 +100,7 @@
 .item-text-preview {
   width: calc(100% - 20px);
   min-height: 20px;
-  padding: 8px 10px;
+  padding: 8px 8px;
   background-color: var(--item-bg, #f0f0f0);
   font-size: 14px;
   font-family: 'Roboto', sans-serif;
