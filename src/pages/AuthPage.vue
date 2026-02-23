@@ -4,6 +4,10 @@ import { useRouter } from 'vue-router'
 import { AxiosError } from 'axios'
 import { httpClient } from '@/api/httpClient'
 import { getAccessToken, setAuthSession } from '@/auth/session'
+import { useUiNotifications } from '@/composables/useUiNotifications'
+import NotificationStack from '@/components/teams/NotificationStack.vue'
+import { consumePendingInviteAfterAuth } from '@/features/invite/composables/consumePendingInviteAfterAuth'
+import { navigateToInviteRedirectPath } from '@/features/invite/navigation'
 import { useRetroStore } from '@/stores/RetroStore'
 
 type AuthMode = 'login' | 'register'
@@ -13,18 +17,13 @@ const retroStore = useRetroStore()
 const mode = ref<AuthMode>('login')
 const isSubmitting = ref(false)
 const errorMessage = ref('')
+const { notifications, pushNotification, dismissNotification } = useUiNotifications()
 
 const form = reactive({
   email: '',
   password: '',
   name: '',
 })
-
-if (getAccessToken()) {
-  void router.replace('/teams')
-} else {
-  retroStore.clearCurrentUser()
-}
 
 const isRegisterMode = computed(() => mode.value === 'register')
 const submitLabel = computed(() => (isRegisterMode.value ? 'Создать аккаунт' : 'Войти'))
@@ -68,6 +67,27 @@ const submit = async () => {
 
     setAuthSession(response.data)
     retroStore.clearCurrentUser()
+    const pendingInviteResult = await consumePendingInviteAfterAuth()
+
+    if (pendingInviteResult.status === 'accepted') {
+      await navigateToInviteRedirectPath(router, pendingInviteResult.redirectPath)
+      return
+    }
+
+    if (pendingInviteResult.status === 'unauthorized') {
+      return
+    }
+
+    if (pendingInviteResult.status === 'invalid') {
+      pushNotification('error', 'Ссылка больше недействительна')
+    } else if (pendingInviteResult.status === 'error') {
+      pushNotification(
+        'error',
+        'Не удалось принять приглашение',
+        'Попробуйте открыть invite-ссылку повторно.',
+      )
+    }
+
     await router.replace('/teams')
   } catch (error) {
     errorMessage.value = getApiErrorMessage(error)
@@ -75,9 +95,19 @@ const submit = async () => {
     isSubmitting.value = false
   }
 }
+
+if (getAccessToken()) {
+  void router.replace('/teams')
+} else {
+  retroStore.clearCurrentUser()
+}
 </script>
 
 <template>
+  <NotificationStack
+    :notifications="notifications"
+    @dismiss="dismissNotification"
+  />
   <main class="auth-page">
     <section class="auth-card">
       <h1 class="auth-title">Retro Board</h1>

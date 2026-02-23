@@ -11,14 +11,17 @@
           autocomplete="off"
         />
       </label>
+
       <button
         type="button"
-        class="board-add-column-button"
+        class="board-action-button"
         @click="onAddColumnClick"
         title="Добавить колонку"
       >
         <SvgIcon name="addColumn" class="board-add-column-button__icon" />
       </button>
+
+      <BoardShareControl />
     </div>
   </section>
 </template>
@@ -27,6 +30,7 @@
 import { computed } from 'vue'
 import { useRetroStore } from '@/stores/RetroStore'
 import SvgIcon from '@/components/common/SvgIcon/SvgIcon.vue'
+import BoardShareControl from './BoardShareControl.vue'
 
 const retroStore = useRetroStore()
 const cardSearchQuery = computed({
@@ -55,6 +59,7 @@ const onAddColumnClick = () => {
   height: 100%;
   display: flex;
   align-items: center;
+  gap: 8px;
   padding: 0 var(--teams-page-padding, 20px);
   box-sizing: border-box;
 }
@@ -88,8 +93,8 @@ const onAddColumnClick = () => {
   border-color: #8ab4ff;
 }
 
-.board-add-column-button {
-  margin-left: 8px;
+.board-action-button {
+  margin-right: auto;
   height: 36px;
   border: 1px solid #c8d4e3;
   border-radius: 8px;
@@ -104,7 +109,7 @@ const onAddColumnClick = () => {
   gap: 8px;
 }
 
-.board-add-column-button:hover {
+.board-action-button:hover {
   border-color: #8ab4ff;
   color: #204380;
 }
@@ -113,5 +118,24 @@ const onAddColumnClick = () => {
   width: 16px;
   height: 16px;
   flex-shrink: 0;
+}
+
+@media (max-width: 768px) {
+  .board-settings-strip {
+    height: auto;
+  }
+
+  .board-settings-strip-inner {
+    flex-wrap: wrap;
+    padding: 10px var(--teams-page-padding, 20px);
+  }
+
+  .board-search {
+    width: 100%;
+  }
+
+  .board-search__input {
+    width: 100%;
+  }
 }
 </style>

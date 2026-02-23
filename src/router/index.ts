@@ -5,6 +5,7 @@ import AuthPage from '../pages/AuthPage.vue'
 import RoomPage from '../pages/RoomPage.vue'
 import TeamsPage from '../pages/TeamsPage.vue'
 import ProfilePage from '../pages/ProfilePage.vue'
+import InvitePage from '../pages/InvitePage.vue'
 
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
@@ -28,6 +29,19 @@ const router = createRouter({
       component: RoomPage,
     },
     {
+      path: '/retro/boards/:id',
+      name: 'retro-board',
+      component: RoomPage,
+    },
+    {
+      path: '/invite/:code',
+      name: 'invite',
+      component: InvitePage,
+      meta: {
+        public: true,
+      },
+    },
+    {
       path: '/profile',
       name: 'profile',
       component: ProfilePage,
@@ -36,6 +50,9 @@ const router = createRouter({
       path: '/auth',
       name: 'auth',
       component: AuthPage,
+      meta: {
+        public: true,
+      },
     },
   ],
 })
@@ -46,8 +63,9 @@ router.beforeEach(async (to) => {
   }
 
   const hasAccessToken = Boolean(getAccessToken())
+  const isPublicRoute = to.matched.some((record) => record.meta.public === true)
 
-  if (to.name !== 'auth' && !hasAccessToken) {
+  if (!isPublicRoute && !hasAccessToken) {
     return { name: 'auth' }
   }
 

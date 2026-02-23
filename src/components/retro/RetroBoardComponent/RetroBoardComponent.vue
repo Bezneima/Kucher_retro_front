@@ -12,12 +12,12 @@
       <template #item="{ element }">
         <RetroColumnComponent :column="element" />
       </template>
-      <template #footer>
+      <!-- <template #footer>
         <button class="board-add-column" type="button" @click="onAddColumnClick">
           <span class="board-add-column__plus">+</span>
           <span>Добавить колонку</span>
         </button>
-      </template>
+      </template> -->
     </Sortable>
   </div>
 </template>
