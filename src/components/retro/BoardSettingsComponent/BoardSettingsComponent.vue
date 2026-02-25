@@ -21,18 +21,64 @@
         <SvgIcon name="addColumn" class="board-add-column-button__icon" />
       </button>
 
+      <button
+        type="button"
+        class="board-nav-button board-nav-button--prev"
+        :disabled="!previousBoardId || isBoardNavigationLoading"
+        @click="navigateToBoard(previousBoardId)"
+      >
+        <SvgIcon name="triangleRight" class="board-nav-button__icon" />
+        <span>Следующая доска</span>
+      </button>
+
+      <button
+        type="button"
+        class="board-nav-button board-nav-button--next"
+        :disabled="!nextBoardId || isBoardNavigationLoading"
+        @click="navigateToBoard(nextBoardId)"
+      >
+        <span>Прошлая доска</span>
+        <SvgIcon name="triangleRight" class="board-nav-button__icon" />
+      </button>
+
       <BoardShareControl />
     </div>
   </section>
 </template>
 
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, ref, watch } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
+import { retroBoardsApiClient } from '@/features/teams/api/teamBoardsClient'
+import type { RetroBoardSummary } from '@/features/teams/types'
 import { useRetroStore } from '@/stores/RetroStore'
 import SvgIcon from '@/components/common/SvgIcon/SvgIcon.vue'
 import BoardShareControl from './BoardShareControl.vue'
 
 const retroStore = useRetroStore()
+const route = useRoute()
+const router = useRouter()
+const teamBoards = ref<RetroBoardSummary[]>([])
+const isBoardNavigationLoading = ref(false)
+
+const getBoardTimestamp = (value: string | null) => {
+  if (!value) {
+    return Number.NEGATIVE_INFINITY
+  }
+
+  const timestamp = Date.parse(value)
+  return Number.isFinite(timestamp) ? timestamp : Number.NEGATIVE_INFINITY
+}
+
+const sortBoardsByDateDesc = (left: RetroBoardSummary, right: RetroBoardSummary) => {
+  const timestampDiff = getBoardTimestamp(right.date) - getBoardTimestamp(left.date)
+  if (timestampDiff !== 0) {
+    return timestampDiff
+  }
+
+  return right.id - left.id
+}
+
 const cardSearchQuery = computed({
   get: () => retroStore.getCardSearchQuery,
   set: (value: string) => {
@@ -40,9 +86,91 @@ const cardSearchQuery = computed({
   },
 })
 
+const currentBoardId = computed(() => {
+  const boardId = Number(route.params.id)
+  return Number.isInteger(boardId) && boardId > 0 ? boardId : null
+})
+
+const currentBoardIndex = computed(() => {
+  const boardId = currentBoardId.value
+  if (!boardId) {
+    return -1
+  }
+
+  return teamBoards.value.findIndex((board) => board.id === boardId)
+})
+
+const previousBoardId = computed(() => {
+  const boardIndex = currentBoardIndex.value
+  if (boardIndex <= 0) {
+    return null
+  }
+
+  return teamBoards.value[boardIndex - 1]?.id ?? null
+})
+
+const nextBoardId = computed(() => {
+  const boardIndex = currentBoardIndex.value
+  if (boardIndex < 0) {
+    return null
+  }
+
+  return teamBoards.value[boardIndex + 1]?.id ?? null
+})
+
+const resolveBoardRouteName = () => {
+  return route.name === 'retro-board' ? 'retro-board' : 'board'
+}
+
+const loadTeamBoardsNavigation = async (boardId: number | null) => {
+  if (!boardId) {
+    teamBoards.value = []
+    return
+  }
+
+  isBoardNavigationLoading.value = true
+  try {
+    const boards = await retroBoardsApiClient.getBoards()
+    const currentBoard = boards.find((board) => board.id === boardId)
+
+    if (!currentBoard) {
+      teamBoards.value = []
+      return
+    }
+
+    teamBoards.value = boards
+      .filter((board) => board.teamId === currentBoard.teamId)
+      .sort(sortBoardsByDateDesc)
+  } catch (error) {
+    console.error('[board-settings] failed to load board navigation', error)
+    teamBoards.value = []
+  } finally {
+    isBoardNavigationLoading.value = false
+  }
+}
+
+const navigateToBoard = (boardId: number | null) => {
+  if (!boardId || boardId === currentBoardId.value) {
+    return
+  }
+
+  void router.push({
+    name: resolveBoardRouteName(),
+    params: { id: boardId },
+  })
+}
+
 const onAddColumnClick = () => {
   retroStore.addColumn()
 }
+
+watch(
+  currentBoardId,
+  (boardId) => {
+    void loadTeamBoardsNavigation(boardId)
+  },
+  { immediate: true },
+)
 </script>
 
 <style scoped>
@@ -94,7 +222,6 @@ const onAddColumnClick = () => {
 }
 
 .board-action-button {
-  margin-right: auto;
   height: 36px;
   border: 1px solid #c8d4e3;
   border-radius: 8px;
@@ -120,6 +247,46 @@ const onAddColumnClick = () => {
   flex-shrink: 0;
 }
 
+.board-nav-button {
+  height: 36px;
+  border: 1px solid #c8d4e3;
+  border-radius: 8px;
+  background: #fff;
+  color: #2f3647;
+  padding: 0 10px;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.board-nav-button:hover {
+  border-color: #8ab4ff;
+  color: #204380;
+}
+
+.board-nav-button:disabled {
+  cursor: not-allowed;
+  opacity: 0.45;
+  color: #7c8699;
+}
+
+.board-nav-button__icon {
+  width: 12px;
+  height: 12px;
+  flex-shrink: 0;
+}
+
+.board-nav-button--prev .board-nav-button__icon {
+  transform: rotate(180deg);
+}
+
+.board-nav-button--next {
+  margin-right: auto;
+}
+
 @media (max-width: 768px) {
   .board-settings-strip {
     height: auto;
@@ -136,6 +303,15 @@ const onAddColumnClick = () => {
 
   .board-search__input {
     width: 100%;
+  }
+
+  .board-nav-button {
+    flex: 1 1 calc(50% - 4px);
+    justify-content: center;
+  }
+
+  .board-nav-button--next {
+    margin-right: 0;
   }
 }
 </style>

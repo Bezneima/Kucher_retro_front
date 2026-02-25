@@ -69,7 +69,7 @@
 </style>
 
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { clearAuthSession } from '@/auth/session'
 import TextEditModal from '@/components/common/TextEditModal/TextEditModal.vue'
@@ -135,12 +135,13 @@ const submitBoardNameEdit = async (nextBoardName: string) => {
   }
 }
 
-onMounted(() => {
+const loadBoardFromRoute = () => {
   const routeBoardId = Number(route.params.id)
 
   if (Number.isFinite(routeBoardId) && routeBoardId > 0) {
     void retroStore.loadBoardById(routeBoardId)
-    return
   }
-})
+}
+
+watch(() => route.params.id, loadBoardFromRoute, { immediate: true })
 </script>
