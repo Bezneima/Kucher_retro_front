@@ -158,11 +158,12 @@ const onDeleteColumnClick = () => {
 <style scoped>
 .retro-item-menu {
   position: fixed;
-  width: 170px;
-  padding: 6px;
-  border: 1px solid #d0d0d0;
-  background-color: white;
-  box-shadow: 0 8px 24px rgb(0 0 0 / 18%);
+  width: 220px;
+  border: 1px solid #d5e2f4;
+  border-radius: 10px;
+  background: #fff;
+  box-shadow: 0 12px 28px rgb(43 76 128 / 15%);
+  padding: 8px;
   z-index: 2000;
 }
 </style>

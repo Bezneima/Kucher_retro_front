@@ -66,9 +66,13 @@ const onDeleteColumnClick = () => emit('deleteColumn')
   width: 100%;
   border: none;
   background: transparent;
-  padding: 8px 10px;
+  border-radius: 8px;
+  padding: 9px 10px;
   text-align: left;
   cursor: pointer;
+  color: #2f4261;
+  font-size: 14px;
+  line-height: 1.2;
 }
 
 .retro-item-menu-button__icon {
@@ -79,10 +83,14 @@ const onDeleteColumnClick = () => emit('deleteColumn')
 }
 
 .retro-item-menu-button:hover {
-  background-color: #f5f5f5;
+  background: #eef4fe;
 }
 
 .retro-item-menu-button-delete {
-  color: #f87171;
+  margin-top: 4px;
+  border-top: 1px solid #d5e2f4;
+  border-radius: 0 0 8px 8px;
+  padding-top: 12px;
+  color: #d24c5d;
 }
 </style>

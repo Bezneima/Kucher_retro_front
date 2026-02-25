@@ -224,7 +224,8 @@ watch(
 
 .teams-sidebar-title {
   margin: 0;
-  font-size: 18px;
+  font-size: 20px;
+  color: #1b2f4b;
 }
 
 .teams-header-actions {

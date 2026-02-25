@@ -215,6 +215,7 @@ const onMemberRoleChange = (event: Event, member: TeamMember) => {
 .team-panel-title {
   margin: 0;
   font-size: 20px;
+  color: #1b2f4b;
 }
 
 .member-form {

@@ -33,30 +33,40 @@ const onColorClick = (color: TRetroColumnColor) => emit('selectColor', color)
   width: 100%;
   border: none;
   background: transparent;
-  padding: 8px 10px;
+  border-radius: 8px;
+  padding: 9px 10px;
   text-align: left;
   cursor: pointer;
+  color: #2f4261;
+  font-size: 14px;
+  line-height: 1.2;
 }
 
 .retro-item-menu-button:hover {
-  background-color: #f5f5f5;
+  background: #eef4fe;
 }
 
 .retro-item-menu-button-back {
-  margin-bottom: 6px;
+  margin-bottom: 8px;
 }
 
 .retro-item-menu-colors-grid {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
-  gap: 6px;
+  gap: 8px;
 }
 
 .retro-item-menu-color-button {
   width: 100%;
   aspect-ratio: 1 / 1;
-  border: 1px solid rgb(0 0 0 / 20%);
-  border-radius: 4px;
+  border: 1px solid #d5e2f4;
+  border-radius: 8px;
   cursor: pointer;
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+
+.retro-item-menu-color-button:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 6px 14px rgb(43 76 128 / 16%);
 }
 </style>

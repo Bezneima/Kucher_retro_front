@@ -224,10 +224,10 @@ const submitLeaveTeam = () => {
 
 .team-panel-label {
   margin: 0;
-  font-size: 12px;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
-  color: #5c7091;
+  font-size: 20px;
+  line-height: 1.25;
+  font-weight: 600;
+  color: #1b2f4b;
 }
 
 .team-panel-main {
@@ -247,10 +247,10 @@ const submitLeaveTeam = () => {
 
 .team-panel-name {
   margin: 0;
-  font-size: 20px;
+  font-size: 16px;
   line-height: 1.25;
-  font-weight: 600;
-  color: #1b2f4b;
+  font-weight: 500;
+  color: #2f4668;
 }
 
 .team-panel-meta {

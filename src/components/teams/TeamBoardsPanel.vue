@@ -349,6 +349,7 @@ const getBoardPreviewColumns = (board: RetroBoardSummary) => {
 .team-panel-title {
   margin: 0;
   font-size: 20px;
+  color: #1b2f4b;
 }
 
 .team-panel-actions {

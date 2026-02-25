@@ -8,7 +8,7 @@
     }"
   >
     <div class="column-top">
-      <div ref="columnHeaderRef" class="column-header" @click="onColumnHeaderClick">
+      <div class="column-header">
         <span
           class="column-drag-handle"
           title="Перетащите для изменения порядка колонки"
@@ -27,15 +27,7 @@
         </span>
       </div>
       <div class="column-header__title-container">
-        <span v-if="!column.isNameEditing" class="column-header__title">{{ column.name }}</span>
-        <input
-          v-else
-          ref="nameInputRef"
-          class="column-header__name-input"
-          type="text"
-          :value="column.name"
-          @input="onNameInput"
-        />
+        <span class="column-header__title" @click="onEditColumnClick">{{ column.name }}</span>
       </div>
       <div v-if="column.description" class="column-description">{{ column.description }}</div>
       <RetroColumnMenu
@@ -82,6 +74,14 @@
       message="Все карточки в этой колонке будут удалены. Действие нельзя отменить."
       @close="onCloseDeleteColumnModal"
       @confirm="onConfirmDeleteColumn"
+    />
+    <TextEditModal
+      :is-open="isEditColumnModalOpen"
+      :value="nameDraft"
+      title="Изменить название колонки"
+      placeholder="Введите название колонки"
+      @close="onCloseEditColumnModal"
+      @confirm="onConfirmEditColumn"
     />
     <TextEditModal
       :is-open="isEditDescriptionModalOpen"
@@ -132,11 +132,7 @@
   font-weight: 500;
   line-height: 1.4;
   color: #000000a8;
-}
-
-.column-header__name-input {
-  flex: 1;
-  min-width: 0;
+  cursor: pointer;
 }
 
 .column-drag-handle {
@@ -230,7 +226,7 @@
 </style>
 
 <script setup lang="ts">
-import { ref, watch, onBeforeUnmount, nextTick, computed } from 'vue'
+import { ref, computed } from 'vue'
 import { Sortable } from 'sortablejs-vue3'
 import { type TRetroColumn, type TRetroColumnColor } from '@/stores/RetroStore'
 import SvgIcon from '@/components/common/SvgIcon/SvgIcon.vue'
@@ -246,12 +242,12 @@ const props = defineProps<{
 }>()
 
 const { column } = props
-const columnHeaderRef = ref<HTMLElement | null>(null)
-const nameInputRef = ref<HTMLInputElement | null>(null)
 const menuButtonRef = ref<HTMLElement | null>(null)
 const isMenuOpen = ref(false)
 const isDeleteColumnModalOpen = ref(false)
+const isEditColumnModalOpen = ref(false)
 const isEditDescriptionModalOpen = ref(false)
+const nameDraft = ref('')
 const descriptionDraft = ref('')
 const sortableKey = computed(() => `${column.id}:${column.items.map((item) => item.id).join(',')}`)
 const isCardFilterActive = computed(() => retroStore.getHasCardSearchQuery)
@@ -270,33 +266,6 @@ const options = {
   emptyInsertThreshold: 20,
 }
 
-const handleClickOutside = (event: MouseEvent) => {
-  if (columnHeaderRef.value && !columnHeaderRef.value.contains(event.target as Node)) {
-    retroStore.updateColumnNameEnd(column.id)
-    document.removeEventListener('mousedown', handleClickOutside)
-  }
-}
-
-watch(
-  () => column.isNameEditing,
-  (isEditing) => {
-    if (isEditing) {
-      document.addEventListener('mousedown', handleClickOutside)
-      nextTick(() => nameInputRef.value?.focus())
-    } else {
-      document.removeEventListener('mousedown', handleClickOutside)
-    }
-  },
-)
-
-onBeforeUnmount(() => {
-  document.removeEventListener('mousedown', handleClickOutside)
-})
-
-const onColumnHeaderClick = () => {
-  retroStore.updateColumnNameStart(column.id)
-}
-
 const onMenuButtonClick = (event: MouseEvent) => {
   event.preventDefault()
   event.stopPropagation()
@@ -309,7 +278,18 @@ const closeMenu = () => {
 
 const onEditColumnClick = () => {
   closeMenu()
-  retroStore.updateColumnNameStart(column.id)
+  nameDraft.value = column.name
+  isEditColumnModalOpen.value = true
+}
+
+const onCloseEditColumnModal = () => {
+  isEditColumnModalOpen.value = false
+}
+
+const onConfirmEditColumn = (value: string) => {
+  retroStore.updateColumnName(column.id, value)
+  retroStore.updateColumnNameEnd(column.id)
+  isEditColumnModalOpen.value = false
 }
 
 const onEditDescriptionClick = () => {
@@ -359,12 +339,6 @@ const onCloseDeleteColumnModal = () => {
 const onConfirmDeleteColumn = () => {
   isDeleteColumnModalOpen.value = false
   retroStore.deleteColumn(column.id)
-}
-
-const onNameInput = (event: Event) => {
-  const target = event.target as HTMLInputElement
-  retroStore.updateColumnName(column.id, target.value)
-  retroStore.setActiveItemId(column.id)
 }
 
 const onColumnChoose = (event: any) => {
