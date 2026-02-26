@@ -1,5 +1,7 @@
 import { httpClient } from '@/api/httpClient'
+import { renameBoard } from '@/shared/socket'
 import { normalizeColumns } from '../helpers/normalize'
+import { reorderColumnsByPayloadIds } from '../helpers/reorderColumns'
 import type { TRetroBoard, TRetroBoardState, TRetroUserBoardRole } from '../types'
 
 type TRecord = Record<string, unknown>
@@ -246,25 +248,60 @@ export const boardActions = {
     }
 
     try {
-      const response = await httpClient.patch(`/retro/boards/${boardId}/name`, {
-        name: normalizedName,
-      })
+      const response = await renameBoard(boardId, normalizedName)
 
-      const responseName = isRecord(response.data) && typeof response.data.name === 'string'
-        ? response.data.name.trim()
-        : ''
-      const nextBoardName = responseName || normalizedName
+      const responseName = typeof response?.name === 'string' ? response.name.trim() : ''
+      if (!responseName) {
+        throw new Error('Invalid board response')
+      }
 
       const currentBoard = this.board[0]
       if (!currentBoard || Number(currentBoard.id) !== boardId) {
         return
       }
 
-      currentBoard.name = nextBoardName
+      currentBoard.name = responseName
       this.board = [{ ...currentBoard }]
     } catch (error) {
       console.error('[retro] failed to update board name', boardId, error)
       throw error
+    }
+  },
+  applyBoardRenamedFromSocket(this: TBoardActionsContext, boardPayload: unknown) {
+    if (!isRecord(boardPayload)) {
+      return
+    }
+
+    const boardId = asPositiveNumber(boardPayload.id)
+    const boardName =
+      typeof boardPayload.name === 'string' && boardPayload.name.trim() ? boardPayload.name.trim() : ''
+    if (!boardId || !boardName) {
+      return
+    }
+
+    const currentBoard = this.board[0]
+    if (!currentBoard || currentBoard.id !== boardId) {
+      return
+    }
+
+    currentBoard.name = boardName
+    this.board = [{ ...currentBoard }]
+  },
+  applyBoardColumnsReorderedFromSocket(
+    this: TBoardActionsContext,
+    payload: { boardId: number; columns: unknown },
+  ) {
+    const currentBoard = this.board[0]
+    if (!currentBoard || currentBoard.id !== payload.boardId) {
+      return
+    }
+
+    try {
+      currentBoard.columns = reorderColumnsByPayloadIds(currentBoard.columns, payload.columns)
+      this.board = [{ ...currentBoard }]
+      this.columnsReorderError = ''
+    } catch (error) {
+      console.error('[retro] failed to apply realtime columns reorder', error)
     }
   },
 }

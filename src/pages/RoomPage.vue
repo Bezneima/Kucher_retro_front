@@ -10,6 +10,8 @@
       @edit-center-title="openBoardNameEditModal"
     />
     <BoardSettingsComponent />
+    <WsConnectionStatus :access-token="accessToken" />
+    <p v-if="realtimeSyncError" class="room-realtime-error">{{ realtimeSyncError }}</p>
 
     <section class="room-content">
       <div class="columns">
@@ -22,9 +24,11 @@
       :is-open="isBoardNameEditModalOpen"
       :value="boardTitle"
       :multiline="false"
+      :is-submitting="isBoardNameUpdating"
+      :error-message="boardNameUpdateError"
       title="Изменить название доски"
       placeholder="Введите название доски"
-      confirm-text="Сохранить"
+      :confirm-text="isBoardNameUpdating ? 'Сохранение...' : 'Сохранить'"
       cancel-text="Отмена"
       @close="closeBoardNameEditModal"
       @confirm="submitBoardNameEdit"
@@ -52,6 +56,12 @@
   display: flex;
 }
 
+.room-realtime-error {
+  margin: 8px 0 0;
+  color: #b3261e;
+  font-size: 13px;
+}
+
 .columns {
   width: 100%;
   flex: 1;
@@ -69,12 +79,22 @@
 </style>
 
 <script setup lang="ts">
-import { computed, ref, watch } from 'vue'
+import { computed, onBeforeUnmount, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { clearAuthSession } from '@/auth/session'
+import type { Socket } from 'socket.io-client'
+import { clearAuthSession, getAccessToken } from '@/auth/session'
 import TextEditModal from '@/components/common/TextEditModal/TextEditModal.vue'
 import GlobalHeader from '@/components/teams/GlobalHeader.vue'
 import BoardSettingsComponent from '@/components/retro/BoardSettingsComponent/BoardSettingsComponent.vue'
+import WsConnectionStatus from '@/components/retro/WsConnectionStatus.vue'
+import { connectSocket, joinBoard } from '@/shared/socket'
+import {
+  WS_SERVER_EVENT_NAMES,
+  type BoardColumnsReorderedEventPayload,
+  type ClientToServerEvents,
+  type ServerToClientEvents,
+  type WsBoard,
+} from '@/shared/ws.types'
 import RetroBoardComponent from '../components/retro/RetroBoardComponent/RetroBoardComponent.vue'
 import Loader from '../components/common/Loader/Loader.vue'
 import { useRetroStore } from '../stores/RetroStore'
@@ -82,6 +102,7 @@ import { useRetroStore } from '../stores/RetroStore'
 const retroStore = useRetroStore()
 const route = useRoute()
 const router = useRouter()
+const accessToken = getAccessToken()
 const userName = computed(() => retroStore.getCurrentUserName || 'Пользователь')
 const boardTitle = computed(() => retroStore.getBoard[0]?.name ?? '')
 const currentBoardId = computed(() => retroStore.getBoard[0]?.id ?? null)
@@ -91,6 +112,10 @@ const canEditBoardName = computed(() => {
 })
 const isBoardNameEditModalOpen = ref(false)
 const isBoardNameUpdating = ref(false)
+const boardNameUpdateError = ref('')
+const realtimeSyncError = ref('')
+let boardSocket: Socket<ServerToClientEvents, ClientToServerEvents> | null = null
+let boardJoinRequestId = 0
 
 const openProfile = async () => {
   await router.push({ name: 'profile' })
@@ -107,10 +132,12 @@ const openBoardNameEditModal = () => {
     return
   }
 
+  boardNameUpdateError.value = ''
   isBoardNameEditModalOpen.value = true
 }
 
 const closeBoardNameEditModal = () => {
+  boardNameUpdateError.value = ''
   isBoardNameEditModalOpen.value = false
 }
 
@@ -125,23 +152,107 @@ const submitBoardNameEdit = async (nextBoardName: string) => {
   }
 
   isBoardNameUpdating.value = true
+  boardNameUpdateError.value = ''
   try {
     await retroStore.updateBoardName(boardId, normalizedName)
     closeBoardNameEditModal()
   } catch (error) {
     console.error('[room] failed to rename board', error)
+    boardNameUpdateError.value =
+      error instanceof Error && typeof error.message === 'string' && error.message
+        ? error.message
+        : 'Не удалось переименовать доску'
   } finally {
     isBoardNameUpdating.value = false
   }
 }
 
-const loadBoardFromRoute = () => {
+const resolveRouteBoardId = () => {
   const routeBoardId = Number(route.params.id)
+  return Number.isFinite(routeBoardId) && routeBoardId > 0 ? routeBoardId : null
+}
 
-  if (Number.isFinite(routeBoardId) && routeBoardId > 0) {
-    void retroStore.loadBoardById(routeBoardId)
+const loadBoardFromRoute = (boardId: number | null) => {
+  if (!boardId) {
+    return
+  }
+
+  void retroStore.loadBoardById(boardId)
+}
+
+const handleBoardRenamed = (payload: WsBoard) => {
+  retroStore.applyBoardRenamedFromSocket(payload)
+}
+
+const handleBoardColumnsReordered = (payload: BoardColumnsReorderedEventPayload) => {
+  const payloadBoardId = Number(payload?.boardId)
+  if (!Number.isInteger(payloadBoardId) || payloadBoardId <= 0) {
+    return
+  }
+
+  retroStore.applyBoardColumnsReorderedFromSocket({
+    boardId: payloadBoardId,
+    columns: payload.columns,
+  })
+}
+
+const unsubscribeBoardRealtimeEvents = () => {
+  if (!boardSocket) {
+    return
+  }
+
+  boardSocket.off(WS_SERVER_EVENT_NAMES.BOARD_RENAMED, handleBoardRenamed)
+  boardSocket.off(WS_SERVER_EVENT_NAMES.BOARD_COLUMNS_REORDERED, handleBoardColumnsReordered)
+}
+
+const subscribeBoardRealtime = async (boardId: number) => {
+  const requestId = ++boardJoinRequestId
+  realtimeSyncError.value = ''
+
+  try {
+    const socket = await connectSocket(accessToken)
+
+    if (requestId !== boardJoinRequestId) {
+      return
+    }
+
+    boardSocket = socket
+    unsubscribeBoardRealtimeEvents()
+    socket.on(WS_SERVER_EVENT_NAMES.BOARD_RENAMED, handleBoardRenamed)
+    socket.on(WS_SERVER_EVENT_NAMES.BOARD_COLUMNS_REORDERED, handleBoardColumnsReordered)
+
+    await joinBoard(boardId)
+  } catch (error) {
+    if (requestId !== boardJoinRequestId) {
+      return
+    }
+
+    realtimeSyncError.value =
+      error instanceof Error && typeof error.message === 'string' && error.message
+        ? error.message
+        : 'Не удалось подключить realtime синхронизацию'
   }
 }
 
-watch(() => route.params.id, loadBoardFromRoute, { immediate: true })
+watch(
+  () => route.params.id,
+  () => {
+    const boardId = resolveRouteBoardId()
+    loadBoardFromRoute(boardId)
+
+    if (!boardId) {
+      boardJoinRequestId += 1
+      unsubscribeBoardRealtimeEvents()
+      return
+    }
+
+    void subscribeBoardRealtime(boardId)
+  },
+  { immediate: true },
+)
+
+onBeforeUnmount(() => {
+  boardJoinRequestId += 1
+  unsubscribeBoardRealtimeEvents()
+})
 </script>

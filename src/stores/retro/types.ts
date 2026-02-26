@@ -63,6 +63,8 @@ export type TItemPositionPayloadChange = {
 export type TRetroBoardState = {
   board: TRetroBoard[]
   isBoardLoading: boolean
+  isColumnsReorderPending: boolean
+  columnsReorderError: string
   activeItemId: number | null
   cardSearchQuery: string
   currentUser: TRetroCurrentUser

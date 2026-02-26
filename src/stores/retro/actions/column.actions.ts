@@ -1,7 +1,9 @@
 import { httpClient } from '@/api/httpClient'
+import { reorderBoardColumns } from '@/shared/socket'
 import { availableColors, goodCardColors } from '../constants'
 import { findColumnById, getBoardColumns, getBoardId } from '../helpers/selectors'
-import type { TRetroColumnColor } from '../types'
+import { reorderColumnsByPayloadIds } from '../helpers/reorderColumns'
+import type { TRetroColumn, TRetroColumnColor } from '../types'
 
 const normalizeColumnColorPayload = (payload: unknown, fallback: TRetroColumnColor): TRetroColumnColor => {
   if (typeof payload === 'string') {
@@ -36,6 +38,17 @@ const normalizeColumnColorPayload = (payload: unknown, fallback: TRetroColumnCol
     itemColor,
     buttonColor,
   }
+}
+
+const cloneColumns = (columns: TRetroColumn[]): TRetroColumn[] => {
+  return columns.map((column) => ({
+    ...column,
+    color: { ...column.color },
+    items: column.items.map((item) => ({
+      ...item,
+      likes: [...item.likes],
+    })),
+  }))
 }
 
 export const columnActions = {
@@ -99,24 +112,50 @@ export const columnActions = {
     this.ensureLastSyncedPositionsInitialized()
 
     const columns = getBoardColumns(this)
+    const boardId = getBoardId(this)
+    if (!boardId) return
+    if (this.isColumnsReorderPending) {
+      return
+    }
+
     if (oldIndex < 0 || newIndex < 0 || oldIndex >= columns.length || newIndex >= columns.length) {
       return
     }
 
+    const previousColumns = cloneColumns(columns)
     const removed = columns.splice(oldIndex, 1)[0]
     if (!removed) return
-
     columns.splice(newIndex, 0, removed)
 
-    const boardId = getBoardId(this)
-    if (!boardId) return
+    this.columnsReorderError = ''
+    this.isColumnsReorderPending = true
 
     try {
-      await httpClient.patch(`/retro/boards/${boardId}/columns/reorder`, { oldIndex, newIndex })
-      await this.syncAllItemIndices()
+      const reorderedColumnsPayload = await reorderBoardColumns(boardId, oldIndex, newIndex)
+      const currentBoard = this.board[0]
+      if (!currentBoard || currentBoard.id !== boardId) {
+        return
+      }
+
+      currentBoard.columns = reorderColumnsByPayloadIds(currentBoard.columns, reorderedColumnsPayload)
+      this.board = [{ ...currentBoard }]
+      await this.syncAllItemIndices().catch((syncError: unknown) => {
+        console.error('[retro] failed to sync item positions after columns reorder', syncError)
+      })
     } catch (error) {
       console.error('[retro] failed to reorder columns', error)
-      await this.loadBoardForUser()
+      const currentBoard = this.board[0]
+      if (currentBoard && currentBoard.id === boardId) {
+        currentBoard.columns = previousColumns
+        this.board = [{ ...currentBoard }]
+      }
+
+      this.columnsReorderError =
+        error instanceof Error && typeof error.message === 'string' && error.message
+          ? error.message
+          : 'Не удалось изменить порядок колонок'
+    } finally {
+      this.isColumnsReorderPending = false
     }
   },
   addColumn(this: any) {

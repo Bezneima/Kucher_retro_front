@@ -23,11 +23,19 @@
           type="text"
           :placeholder="placeholder"
         />
+        <p v-if="errorMessage" class="text-edit-modal__error">
+          {{ errorMessage }}
+        </p>
         <div class="text-edit-modal__actions">
           <button type="button" class="text-edit-modal__button" @click="emit('close')">
             {{ cancelText }}
           </button>
-          <button type="button" class="text-edit-modal__button text-edit-modal__button-primary" @click="onConfirm">
+          <button
+            type="button"
+            class="text-edit-modal__button text-edit-modal__button-primary"
+            :disabled="isSubmitting"
+            @click="onConfirm"
+          >
             {{ confirmText }}
           </button>
         </div>
@@ -48,6 +56,8 @@ const props = withDefaults(
     confirmText?: string
     cancelText?: string
     multiline?: boolean
+    isSubmitting?: boolean
+    errorMessage?: string
   }>(),
   {
     value: '',
@@ -56,6 +66,8 @@ const props = withDefaults(
     confirmText: 'Сохранить',
     cancelText: 'Отмена',
     multiline: true,
+    isSubmitting: false,
+    errorMessage: '',
   },
 )
 
@@ -83,6 +95,10 @@ const onOverlayPointerUp = (event: PointerEvent) => {
 }
 
 const onConfirm = () => {
+  if (props.isSubmitting) {
+    return
+  }
+
   emit('confirm', text.value.trim())
 }
 
@@ -91,6 +107,12 @@ const onDocumentKeydown = (event: KeyboardEvent) => {
 
   if (event.key === 'Escape') {
     emit('close')
+    return
+  }
+
+  if (!props.multiline && event.key === 'Enter') {
+    event.preventDefault()
+    onConfirm()
     return
   }
 
@@ -209,7 +231,18 @@ onBeforeUnmount(() => {
   font-weight: 600;
 }
 
+.text-edit-modal__button-primary:disabled {
+  opacity: 0.7;
+  cursor: not-allowed;
+}
+
 .text-edit-modal__button-primary:hover {
   background: #1878c9;
+}
+
+.text-edit-modal__error {
+  margin: 8px 0 0;
+  font-size: 13px;
+  color: #b3261e;
 }
 </style>

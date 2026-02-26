@@ -3,6 +3,8 @@ import type { TRetroBoardState } from './types'
 export const retroGetters = {
   getBoard: (state: TRetroBoardState) => state.board,
   getBoardColumns: (state: TRetroBoardState) => state.board[0]?.columns ?? [],
+  getIsColumnsReorderPending: (state: TRetroBoardState) => state.isColumnsReorderPending,
+  getColumnsReorderError: (state: TRetroBoardState) => state.columnsReorderError,
   getCurrentBoardTeamId: (state: TRetroBoardState) => state.board[0]?.teamId ?? null,
   getIsAllCardsHidden: (state: TRetroBoardState) => state.board[0]?.isAllCardsHidden ?? false,
   getCardUiState:

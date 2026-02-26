@@ -1,5 +1,6 @@
 <template>
   <div class="board">
+    <p v-if="columnsReorderError" class="board-reorder-error">{{ columnsReorderError }}</p>
     <Sortable
       :key="columnsSortableKey"
       class="board-columns"
@@ -24,6 +25,7 @@
 
 <style>
 .board {
+  position: relative;
   height: 100%;
   min-height: 0;
   display: flex;
@@ -32,6 +34,21 @@
   padding: 0px 10px;
   overflow-x: auto;
   overflow-y: hidden;
+}
+
+.board-reorder-error {
+  position: absolute;
+  top: 6px;
+  left: 10px;
+  z-index: 2;
+  margin: 0;
+  padding: 6px 10px;
+  border-radius: 8px;
+  border: 1px solid #e5b4b4;
+  background: #fff;
+  color: #b3261e;
+  font-size: 12px;
+  line-height: 1.3;
 }
 
 .board-columns {
@@ -94,6 +111,8 @@ import RetroColumnComponent from '../RetroColumnComponent/RetroColumn.vue'
 
 const retroStore = useRetroStore()
 const columns = computed(() => retroStore.getBoardColumns)
+const isColumnsReorderPending = computed(() => retroStore.getIsColumnsReorderPending)
+const columnsReorderError = computed(() => retroStore.getColumnsReorderError)
 const columnsSortableKey = computed(() => columns.value.map((column) => column.id).join(','))
 const MAX_VISIBLE_COLUMNS = 6
 const boardColumnsStyle = computed(() => {
@@ -101,16 +120,18 @@ const boardColumnsStyle = computed(() => {
   return { '--visible-columns': String(visibleColumns) }
 })
 
-const columnSortableOptions = {
+const columnSortableOptions = computed(() => ({
   handle: '.column-drag-handle',
   animation: 150,
   ghostClass: 'board-column-ghost',
-}
+  disabled: isColumnsReorderPending.value,
+}))
 
 const onColumnsReorderEnd = (evt) => {
+  if (isColumnsReorderPending.value) return
   if (typeof evt.oldIndex !== 'number' || typeof evt.newIndex !== 'number') return
   if (evt.oldIndex === evt.newIndex) return
-  retroStore.reorderColumns(evt.oldIndex, evt.newIndex)
+  void retroStore.reorderColumns(evt.oldIndex, evt.newIndex)
 }
 
 const onAddColumnClick = () => {
