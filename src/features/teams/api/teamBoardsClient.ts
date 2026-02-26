@@ -75,6 +75,10 @@ const getNestedRecord = (record: TRecord, key: string): TRecord | undefined => {
   return isRecord(nested) ? nested : undefined
 }
 
+const asBoolean = (value: unknown) => {
+  return value === true
+}
+
 const DEFAULT_PREVIEW_COLUMN_COLOR = '#d7dfeb'
 const DEFAULT_PREVIEW_COLUMN_COLOR_SET: RetroBoardSummaryColumnColor = {
   columnColor: DEFAULT_PREVIEW_COLUMN_COLOR,
@@ -234,7 +238,39 @@ const normalizeBoard = (payload: unknown, fallbackTeamId?: number): RetroBoardSu
     name: asString(payload.name) ?? `Board ${id}`,
     date: asString(payload.date) ?? null,
     description: asString(payload.description) ?? null,
+    isAllCardsHidden: asBoolean(payload.isAllCardsHidden),
     columns: normalizeBoardColumns(payload.columns),
+  }
+}
+
+export type TeamCardsVisibilitySettings = {
+  id: number
+  isAllCardsHidden: boolean
+  updatedAt: string
+}
+
+const normalizeTeamCardsVisibilitySettings = (
+  payload: unknown,
+  fallbackTeamId: number,
+  fallbackIsAllCardsHidden: boolean,
+): TeamCardsVisibilitySettings => {
+  if (!isRecord(payload)) {
+    return {
+      id: fallbackTeamId,
+      isAllCardsHidden: fallbackIsAllCardsHidden,
+      updatedAt: '',
+    }
+  }
+
+  const id = asPositiveNumber(payload.id) ?? fallbackTeamId
+
+  return {
+    id,
+    isAllCardsHidden:
+      typeof payload.isAllCardsHidden === 'boolean'
+        ? payload.isAllCardsHidden
+        : fallbackIsAllCardsHidden,
+    updatedAt: asString(payload.updatedAt) ?? '',
   }
 }
 
@@ -318,6 +354,19 @@ export const teamsApiClient = {
       return normalizeTeam(response.data)
     } catch (error) {
       throw toTeamBoardsApiError(error, 'Не удалось обновить команду')
+    }
+  },
+  async updateTeamCardsVisibility(
+    teamId: number,
+    isAllCardsHidden: boolean,
+  ): Promise<TeamCardsVisibilitySettings> {
+    try {
+      const response = await httpClient.patch(`/teams/${teamId}/is-all-cards-hidden`, {
+        isAllCardsHidden,
+      })
+      return normalizeTeamCardsVisibilitySettings(response.data, teamId, isAllCardsHidden)
+    } catch (error) {
+      throw toTeamBoardsApiError(error, 'Не удалось обновить режим скрытия карточек')
     }
   },
   async leaveTeam(teamId: number): Promise<void> {

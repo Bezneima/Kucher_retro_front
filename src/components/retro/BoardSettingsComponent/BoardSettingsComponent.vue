@@ -41,6 +41,18 @@
         <SvgIcon name="triangleRight" class="board-nav-button__icon" />
       </button>
 
+      <button
+        v-if="canToggleCardsVisibilityControl"
+        type="button"
+        class="board-action-button board-cards-visibility-button"
+        :title="cardsVisibilityButtonTitle"
+        :aria-label="cardsVisibilityButtonTitle"
+        :disabled="isCardsVisibilityUpdating"
+        @click="onToggleCardsVisibilityClick"
+      >
+        <SvgIcon :name="cardsVisibilityIconName" class="board-cards-visibility-button__icon" />
+      </button>
+
       <BoardShareControl />
     </div>
   </section>
@@ -49,7 +61,11 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { retroBoardsApiClient } from '@/features/teams/api/teamBoardsClient'
+import {
+  retroBoardsApiClient,
+  teamsApiClient,
+  toTeamBoardsApiError,
+} from '@/features/teams/api/teamBoardsClient'
 import type { RetroBoardSummary } from '@/features/teams/types'
 import { useRetroStore } from '@/stores/RetroStore'
 import SvgIcon from '@/components/common/SvgIcon/SvgIcon.vue'
@@ -60,6 +76,7 @@ const route = useRoute()
 const router = useRouter()
 const teamBoards = ref<RetroBoardSummary[]>([])
 const isBoardNavigationLoading = ref(false)
+const isCardsVisibilityUpdating = ref(false)
 
 const getBoardTimestamp = (value: string | null) => {
   if (!value) {
@@ -89,6 +106,19 @@ const cardSearchQuery = computed({
 const currentBoardId = computed(() => {
   const boardId = Number(route.params.id)
   return Number.isInteger(boardId) && boardId > 0 ? boardId : null
+})
+const currentTeamId = computed(() => retroStore.getCurrentBoardTeamId)
+const isAllCardsHidden = computed(() => retroStore.getIsAllCardsHidden)
+const currentUserRole = computed(() => retroStore.getCurrentUserTeamRole)
+const canManageBoard = computed(() => {
+  return currentUserRole.value === 'OWNER' || currentUserRole.value === 'ADMIN'
+})
+const canToggleCardsVisibilityControl = computed(() => {
+  return canManageBoard.value && Boolean(currentTeamId.value)
+})
+const cardsVisibilityIconName = computed(() => (isAllCardsHidden.value ? 'eyeSlash' : 'eye'))
+const cardsVisibilityButtonTitle = computed(() => {
+  return isAllCardsHidden.value ? 'Показать содержимое карточек' : 'Скрыть содержимое карточек'
 })
 
 const currentBoardIndex = computed(() => {
@@ -162,6 +192,34 @@ const navigateToBoard = (boardId: number | null) => {
 
 const onAddColumnClick = () => {
   retroStore.addColumn()
+}
+
+const onToggleCardsVisibilityClick = async () => {
+  if (isCardsVisibilityUpdating.value || !canManageBoard.value) {
+    return
+  }
+
+  const teamId = currentTeamId.value
+  const boardId = currentBoardId.value
+  if (!teamId || !boardId) {
+    return
+  }
+
+  isCardsVisibilityUpdating.value = true
+  const nextVisibilityValue = !isAllCardsHidden.value
+
+  try {
+    const response = await teamsApiClient.updateTeamCardsVisibility(teamId, nextVisibilityValue)
+    retroStore.setBoardCardsHidden(response.isAllCardsHidden)
+    await retroStore.loadBoardById(boardId)
+  } catch (error) {
+    const apiError = toTeamBoardsApiError(error, 'Не удалось обновить режим скрытия карточек')
+    if (typeof window !== 'undefined') {
+      window.alert(apiError.message)
+    }
+  } finally {
+    isCardsVisibilityUpdating.value = false
+  }
 }
 
 watch(
@@ -241,7 +299,25 @@ watch(
   color: #204380;
 }
 
+.board-action-button:disabled {
+  cursor: not-allowed;
+  opacity: 0.45;
+  color: #7c8699;
+}
+
 .board-add-column-button__icon {
+  width: 16px;
+  height: 16px;
+  flex-shrink: 0;
+}
+
+.board-cards-visibility-button {
+  width: 36px;
+  justify-content: center;
+  padding: 0;
+}
+
+.board-cards-visibility-button__icon {
   width: 16px;
   height: 16px;
   flex-shrink: 0;

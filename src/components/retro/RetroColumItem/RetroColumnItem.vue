@@ -26,11 +26,11 @@
       @delete-card="onDeleteCardClick"
       :cardColor="element.color"
     />
-    <div v-if="!isEditing" class="item-text-preview" @click="startEditingOnTextAreaClick">
-      {{ editText || ' ' }}
+    <div v-if="cardUiState.showPreview" class="item-text-preview" @click="startEditingOnTextAreaClick">
+      {{ cardUiState.previewText }}
     </div>
     <textarea
-      v-else
+      v-else-if="cardUiState.showEditor"
       ref="textareaRef"
       v-model="editText"
       class="item-textarea item-textarea-isEditing"
@@ -39,8 +39,8 @@
       @keydown.enter.exact.prevent="saveAndClose"
       @keydown.escape="cancelEditing"
     />
-    <div :class="['card-footer', { 'card-footer-edited': isEditing }]" @click="onFooterClick">
-      <template v-if="!isEditing">
+    <div :class="['card-footer', { 'card-footer-edited': cardUiState.isFooterEdited }]" @click="onFooterClick">
+      <template v-if="cardUiState.showFooterMeta">
         <span v-if="formattedCreatedAt" class="card-footer-date">{{ formattedCreatedAt }}</span>
 
         <div class="card-footer-actions">
@@ -604,6 +604,9 @@ let commentsLoadRequestId = 0
 
 const currentUserId = computed(() => retroStore.getCurrentUserId)
 const currentUserTeamRole = computed(() => retroStore.getCurrentUserTeamRole)
+const cardUiState = computed(() =>
+  retroStore.getCardUiState(props.element.id, isEditing.value, editText.value),
+)
 
 const canManageCommentsByRole = computed(() => {
   return currentUserTeamRole.value === 'OWNER' || currentUserTeamRole.value === 'ADMIN'
@@ -767,10 +770,19 @@ watch(
 
 function startEditingOnTextAreaClick(e: MouseEvent) {
   e.stopPropagation()
+  if (!cardUiState.value.canStartEditing) {
+    retroStore.clearActiveItemIfCardsHidden(props.element.id)
+    return
+  }
   openEditing()
 }
 
 function openEditing() {
+  if (!cardUiState.value.canStartEditing) {
+    retroStore.clearActiveItemIfCardsHidden(props.element.id)
+    return
+  }
+
   isEditing.value = true
   editText.value = props.element.description
   nextTick(() => {
@@ -809,6 +821,9 @@ function handleClickOutside(e: MouseEvent) {
 
 function onFooterClick(e: MouseEvent) {
   e.stopPropagation()
+  if (!cardUiState.value.canStartEditing) {
+    return
+  }
   startEditingOnTextAreaClick(e)
 }
 
@@ -943,7 +958,9 @@ const onConfirmDeleteCard = () => {
 
 const onCopyTextClick = async () => {
   closeMenu()
-  const textToCopy = editText.value.trim()
+  if (!cardUiState.value.canCopyText) return
+
+  const textToCopy = props.element.description.trim()
   if (!textToCopy) return
 
   try {
@@ -975,6 +992,18 @@ watch(
     }
   },
   { immediate: true },
+)
+
+watch(
+  () => cardUiState.value.isHidden,
+  (isHidden) => {
+    if (!isHidden || !isEditing.value) {
+      return
+    }
+
+    textareaRef.value?.blur()
+    cancelEditing()
+  },
 )
 
 onMounted(() => {

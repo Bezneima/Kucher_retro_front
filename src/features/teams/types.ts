@@ -21,6 +21,7 @@ export type RetroBoardSummary = {
   name: string
   date: string | null
   description: string | null
+  isAllCardsHidden: boolean
   columns: RetroBoardSummaryColumn[]
 }
 

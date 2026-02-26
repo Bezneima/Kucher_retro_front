@@ -1,6 +1,6 @@
 import { httpClient } from '@/api/httpClient'
 import { normalizeColumns } from '../helpers/normalize'
-import type { TRetroBoard, TRetroUserBoardRole } from '../types'
+import type { TRetroBoard, TRetroBoardState, TRetroUserBoardRole } from '../types'
 
 type TRecord = Record<string, unknown>
 
@@ -19,6 +19,10 @@ const asPositiveNumber = (value: unknown): number | null => {
   }
 
   return normalized
+}
+
+const asBoolean = (value: unknown): boolean => {
+  return value === true
 }
 
 const extractTeamRoleFromBoardPayload = (payload: unknown): TRetroUserBoardRole | null => {
@@ -41,6 +45,14 @@ const extractTeamIdFromBoardPayload = (payload: unknown): number | null => {
 
   const teamPayload = isRecord(payload.team) ? payload.team : undefined
   return asPositiveNumber(payload.teamId ?? teamPayload?.id)
+}
+
+const extractIsAllCardsHiddenFromBoardPayload = (payload: unknown): boolean => {
+  if (!isRecord(payload)) {
+    return false
+  }
+
+  return asBoolean(payload.isAllCardsHidden)
 }
 
 const extractCollectionPayload = (payload: unknown): unknown[] => {
@@ -104,14 +116,41 @@ const resolveCurrentUserBoardRole = async (boardPayload: unknown): Promise<TRetr
   }
 }
 
+type TBoardActionsContext = TRetroBoardState & {
+  loadBoardData: (boardData: Partial<TRetroBoard> | undefined) => Promise<void>
+  normalizeColumns: (columnsData: unknown) => TRetroBoard['columns']
+  setLastSyncedPositions: () => void
+}
+
 export const boardActions = {
-  setCardSearchQuery(this: any, query: string) {
+  setCardSearchQuery(this: TBoardActionsContext, query: string) {
     this.cardSearchQuery = typeof query === 'string' ? query : ''
   },
-  normalizeColumns(this: any, columnsData: unknown) {
+  clearActiveItemIfCardsHidden(this: TBoardActionsContext, itemId: number) {
+    if (!Number.isFinite(itemId)) {
+      return
+    }
+
+    const isAllCardsHidden = this.board[0]?.isAllCardsHidden ?? false
+    if (!isAllCardsHidden || this.activeItemId !== itemId) {
+      return
+    }
+
+    this.activeItemId = null
+  },
+  setBoardCardsHidden(this: TBoardActionsContext, isAllCardsHidden: boolean) {
+    const currentBoard = this.board[0]
+    if (!currentBoard) {
+      return
+    }
+
+    currentBoard.isAllCardsHidden = isAllCardsHidden
+    this.board = [{ ...currentBoard }]
+  },
+  normalizeColumns(this: TBoardActionsContext, columnsData: unknown) {
     return normalizeColumns(columnsData)
   },
-  async loadBoardData(this: any, boardData: Partial<TRetroBoard> | undefined) {
+  async loadBoardData(this: TBoardActionsContext, boardData: Partial<TRetroBoard> | undefined) {
     if (!boardData) {
       this.board = []
       this.currentUserTeamRole = null
@@ -131,9 +170,11 @@ export const boardActions = {
 
     const board: TRetroBoard = {
       id: boardId,
+      teamId: extractTeamIdFromBoardPayload(boardData),
       name: boardData.name ?? '',
       date: boardData.date ?? '',
       description: boardData.description ?? '',
+      isAllCardsHidden: extractIsAllCardsHiddenFromBoardPayload(boardData),
       columns: [],
     }
 
@@ -148,7 +189,7 @@ export const boardActions = {
     this.board = [board]
     this.setLastSyncedPositions()
   },
-  async loadBoardForUser(this: any) {
+  async loadBoardForUser(this: TBoardActionsContext) {
     this.isBoardLoading = true
     try {
       const boardsResponse = await httpClient.get('/retro/boards')
@@ -163,7 +204,7 @@ export const boardActions = {
       this.isBoardLoading = false
     }
   },
-  async loadBoardById(this: any, boardId: number) {
+  async loadBoardById(this: TBoardActionsContext, boardId: number) {
     this.isBoardLoading = true
     try {
       const [boardsResponse, columnsResponse] = await Promise.all([
@@ -179,9 +220,11 @@ export const boardActions = {
 
       const board: TRetroBoard = {
         id: boardId,
+        teamId: extractTeamIdFromBoardPayload(rawBoard),
         name: typeof rawBoard?.name === 'string' ? rawBoard.name : `Board ${boardId}`,
         date: typeof rawBoard?.date === 'string' ? rawBoard.date : '',
         description: typeof rawBoard?.description === 'string' ? rawBoard.description : '',
+        isAllCardsHidden: extractIsAllCardsHiddenFromBoardPayload(rawBoard),
         columns: this.normalizeColumns(columnsResponse.data),
       }
 
@@ -196,7 +239,7 @@ export const boardActions = {
       this.isBoardLoading = false
     }
   },
-  async updateBoardName(this: any, boardId: number, name: string) {
+  async updateBoardName(this: TBoardActionsContext, boardId: number, name: string) {
     const normalizedName = name.trim()
     if (!normalizedName) {
       return

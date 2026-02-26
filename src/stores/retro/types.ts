@@ -29,9 +29,11 @@ export type TRetroColumn = {
 
 export type TRetroBoard = {
   id: number
+  teamId: number | null
   name: string
   date: string
   description: string
+  isAllCardsHidden: boolean
   columns: TRetroColumn[]
 }
 
