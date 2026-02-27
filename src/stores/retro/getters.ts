@@ -48,4 +48,10 @@ export const retroGetters = {
   getCurrentUserName: (state: TRetroBoardState) =>
     state.currentUser.name ?? state.currentUser.email ?? '',
   getCurrentUserTeamRole: (state: TRetroBoardState) => state.currentUserTeamRole,
+  getItemComments: (state: TRetroBoardState) => (itemId: number) => {
+    return state.commentsByItemId[itemId] ?? []
+  },
+  hasItemCommentsCache: (state: TRetroBoardState) => (itemId: number) => {
+    return Number.isInteger(itemId) && itemId > 0 && Object.prototype.hasOwnProperty.call(state.commentsByItemId, itemId)
+  },
 }

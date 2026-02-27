@@ -67,6 +67,7 @@ export const normalizeColumns = (columnsData: unknown): TRetroColumn[] => {
       description: typeof rawColumn.description === 'string' ? rawColumn.description : '',
       color: normalizeColumnColor(rawColumn.color, columnIndex),
       isNameEditing: false,
+      isDraft: false,
       items: itemsData.map((itemData, rowIndex) => {
         const rawItem = itemData as Partial<TRetroColumnItem>
         const normalizedCommentsCount = Number(rawItem.commentsCount)

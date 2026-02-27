@@ -87,14 +87,9 @@ import TextEditModal from '@/components/common/TextEditModal/TextEditModal.vue'
 import GlobalHeader from '@/components/teams/GlobalHeader.vue'
 import BoardSettingsComponent from '@/components/retro/BoardSettingsComponent/BoardSettingsComponent.vue'
 import WsConnectionStatus from '@/components/retro/WsConnectionStatus.vue'
+import { bindRetroSocketListeners } from '@/shared/bindRetroSocketListeners'
 import { connectSocket, joinBoard } from '@/shared/socket'
-import {
-  WS_SERVER_EVENT_NAMES,
-  type BoardColumnsReorderedEventPayload,
-  type ClientToServerEvents,
-  type ServerToClientEvents,
-  type WsBoard,
-} from '@/shared/ws.types'
+import type { ClientToServerEvents, ServerToClientEvents } from '@/shared/ws.types'
 import RetroBoardComponent from '../components/retro/RetroBoardComponent/RetroBoardComponent.vue'
 import Loader from '../components/common/Loader/Loader.vue'
 import { useRetroStore } from '../stores/RetroStore'
@@ -115,6 +110,7 @@ const isBoardNameUpdating = ref(false)
 const boardNameUpdateError = ref('')
 const realtimeSyncError = ref('')
 let boardSocket: Socket<ServerToClientEvents, ClientToServerEvents> | null = null
+let unsubscribeRetroListeners: (() => void) | null = null
 let boardJoinRequestId = 0
 
 const openProfile = async () => {
@@ -122,6 +118,10 @@ const openProfile = async () => {
 }
 
 const logout = async () => {
+  boardJoinRequestId += 1
+  unsubscribeRetroListeners?.()
+  unsubscribeRetroListeners = null
+  boardSocket = null
   retroStore.clearCurrentUser()
   clearAuthSession()
   await router.replace({ name: 'auth' })
@@ -180,29 +180,9 @@ const loadBoardFromRoute = (boardId: number | null) => {
   void retroStore.loadBoardById(boardId)
 }
 
-const handleBoardRenamed = (payload: WsBoard) => {
-  retroStore.applyBoardRenamedFromSocket(payload)
-}
-
-const handleBoardColumnsReordered = (payload: BoardColumnsReorderedEventPayload) => {
-  const payloadBoardId = Number(payload?.boardId)
-  if (!Number.isInteger(payloadBoardId) || payloadBoardId <= 0) {
-    return
-  }
-
-  retroStore.applyBoardColumnsReorderedFromSocket({
-    boardId: payloadBoardId,
-    columns: payload.columns,
-  })
-}
-
 const unsubscribeBoardRealtimeEvents = () => {
-  if (!boardSocket) {
-    return
-  }
-
-  boardSocket.off(WS_SERVER_EVENT_NAMES.BOARD_RENAMED, handleBoardRenamed)
-  boardSocket.off(WS_SERVER_EVENT_NAMES.BOARD_COLUMNS_REORDERED, handleBoardColumnsReordered)
+  unsubscribeRetroListeners?.()
+  unsubscribeRetroListeners = null
 }
 
 const subscribeBoardRealtime = async (boardId: number) => {
@@ -218,8 +198,62 @@ const subscribeBoardRealtime = async (boardId: number) => {
 
     boardSocket = socket
     unsubscribeBoardRealtimeEvents()
-    socket.on(WS_SERVER_EVENT_NAMES.BOARD_RENAMED, handleBoardRenamed)
-    socket.on(WS_SERVER_EVENT_NAMES.BOARD_COLUMNS_REORDERED, handleBoardColumnsReordered)
+    unsubscribeRetroListeners = bindRetroSocketListeners(socket, {
+      onBoardRenamed: (payload) => {
+        retroStore.applyRealtimeBoardRenamed(payload)
+      },
+      onBoardColumnsReordered: (payload) => {
+        retroStore.applyRealtimeBoardColumnsReordered(payload)
+      },
+      onBoardItemsPositionsSynced: (payload) => {
+        retroStore.applyRealtimeBoardItemsPositionsSynced(payload)
+      },
+      onColumnCreated: (payload) => {
+        retroStore.applyRealtimeColumnCreated(payload)
+      },
+      onColumnNameUpdated: (payload) => {
+        retroStore.applyRealtimeColumnNameUpdated(payload)
+      },
+      onColumnColorUpdated: (payload) => {
+        retroStore.applyRealtimeColumnColorUpdated(payload)
+      },
+      onColumnDescriptionUpdated: (payload) => {
+        retroStore.applyRealtimeColumnDescriptionUpdated(payload)
+      },
+      onColumnDeleted: (payload) => {
+        retroStore.applyRealtimeColumnDeleted(payload)
+      },
+      onItemCreated: (payload) => {
+        retroStore.applyRealtimeItemCreated(payload)
+      },
+      onItemDescriptionUpdated: (payload) => {
+        retroStore.applyRealtimeItemDescriptionUpdated(payload)
+      },
+      onItemLikeToggled: (payload) => {
+        retroStore.applyRealtimeItemLikeToggled(payload)
+      },
+      onItemColorUpdated: (payload) => {
+        retroStore.applyRealtimeItemColorUpdated(payload)
+      },
+      onItemDeleted: (payload) => {
+        retroStore.applyRealtimeItemDeleted(payload)
+      },
+      onItemCommentsFetched: (payload) => {
+        retroStore.applyRealtimeItemCommentsFetched(payload)
+      },
+      onItemCommentCreated: (payload) => {
+        retroStore.applyRealtimeItemCommentCreated(payload)
+      },
+      onItemCommentUpdated: (payload) => {
+        retroStore.applyRealtimeItemCommentUpdated(payload)
+      },
+      onItemCommentDeleted: (payload) => {
+        retroStore.applyRealtimeItemCommentDeleted(payload)
+      },
+      onTeamAllCardsVisibilityUpdated: (payload) => {
+        retroStore.applyRealtimeTeamAllCardsVisibilityUpdated(payload)
+      },
+    })
 
     await joinBoard(boardId)
   } catch (error) {
@@ -243,6 +277,7 @@ watch(
     if (!boardId) {
       boardJoinRequestId += 1
       unsubscribeBoardRealtimeEvents()
+      boardSocket = null
       return
     }
 
@@ -254,5 +289,6 @@ watch(
 onBeforeUnmount(() => {
   boardJoinRequestId += 1
   unsubscribeBoardRealtimeEvents()
+  boardSocket = null
 })
 </script>

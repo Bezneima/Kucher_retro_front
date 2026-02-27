@@ -22,7 +22,18 @@ let socketToken: string | null = null
 let connectInFlight: Promise<Socket<ServerToClientEvents, ClientToServerEvents>> | null = null
 
 const resolveWsUrl = () => {
-  return import.meta.env.VITE_RETRO_WS_URL?.trim() || DEFAULT_WS_URL
+  const explicitWsUrl = import.meta.env.VITE_RETRO_WS_URL?.trim()
+  if (explicitWsUrl) {
+    return explicitWsUrl
+  }
+
+  const apiUrl = import.meta.env.VITE_RETRO_API_BASE_URL?.trim()
+  if (apiUrl) {
+    const normalizedApiUrl = apiUrl.endsWith('/') ? apiUrl.slice(0, -1) : apiUrl
+    return `${normalizedApiUrl}/ws`
+  }
+
+  return DEFAULT_WS_URL
 }
 
 const isRecord = (value: unknown): value is Record<string, unknown> => {

@@ -1,3 +1,5 @@
+import type { RetroItemCommentResponseDto } from '@/api/services/retroCommentsService'
+
 export type TRetroColumnItem = {
   id: number
   description: string
@@ -24,6 +26,7 @@ export type TRetroColumn = {
   description: string
   color: TRetroColumnColor
   isNameEditing: boolean
+  isDraft?: boolean
   items: TRetroColumnItem[]
 }
 
@@ -69,6 +72,8 @@ export type TRetroBoardState = {
   cardSearchQuery: string
   currentUser: TRetroCurrentUser
   currentUserTeamRole: TRetroUserBoardRole | null
+  commentsByItemId: Record<number, RetroItemCommentResponseDto[]>
+  commentItemIdByCommentId: Record<number, number>
   /** Позиции элементов на момент последней синхронизации с беком (или загрузки) */
   lastSyncedPositions: Record<number, { columnId: number; rowIndex: number }>
 }

@@ -9,6 +9,7 @@ type TItemActionsContext = TRetroBoardState & {
   setActiveItemId: (itemId: number | null) => void
   setLastSyncedPositions: () => void
   getCurrentUserId: string
+  clearItemCommentsCache: (itemId: number) => void
 }
 
 export const itemActions = {
@@ -180,6 +181,7 @@ export const itemActions = {
       column.items = column.items.filter((i) => i.id !== itemId)
     }
     void this.syncAllItemIndices()
+    this.clearItemCommentsCache(itemId)
 
     if (isDraftItem) return
     void httpClient.delete(`/retro/items/${itemId}`)

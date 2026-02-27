@@ -120,6 +120,7 @@ const resolveCurrentUserBoardRole = async (boardPayload: unknown): Promise<TRetr
 
 type TBoardActionsContext = TRetroBoardState & {
   loadBoardData: (boardData: Partial<TRetroBoard> | undefined) => Promise<void>
+  loadBoardColumns: (boardId: number) => Promise<void>
   normalizeColumns: (columnsData: unknown) => TRetroBoard['columns']
   setLastSyncedPositions: () => void
 }
@@ -156,6 +157,8 @@ export const boardActions = {
     if (!boardData) {
       this.board = []
       this.currentUserTeamRole = null
+      this.commentsByItemId = {}
+      this.commentItemIdByCommentId = {}
       this.lastSyncedPositions = {}
       return
     }
@@ -164,6 +167,8 @@ export const boardActions = {
     if (!boardId) {
       this.board = []
       this.currentUserTeamRole = null
+      this.commentsByItemId = {}
+      this.commentItemIdByCommentId = {}
       this.lastSyncedPositions = {}
       return
     }
@@ -189,6 +194,8 @@ export const boardActions = {
     }
 
     this.board = [board]
+    this.commentsByItemId = {}
+    this.commentItemIdByCommentId = {}
     this.setLastSyncedPositions()
   },
   async loadBoardForUser(this: TBoardActionsContext) {
@@ -231,14 +238,37 @@ export const boardActions = {
       }
 
       this.board = [board]
+      this.commentsByItemId = {}
+      this.commentItemIdByCommentId = {}
       this.setLastSyncedPositions()
     } catch (error) {
       console.error('[retro] failed to load board by id', boardId, error)
       this.board = []
       this.currentUserTeamRole = null
+      this.commentsByItemId = {}
+      this.commentItemIdByCommentId = {}
       this.lastSyncedPositions = {}
     } finally {
       this.isBoardLoading = false
+    }
+  },
+  async loadBoardColumns(this: TBoardActionsContext, boardId: number) {
+    if (!Number.isInteger(boardId) || boardId <= 0) {
+      return
+    }
+
+    const currentBoard = this.board[0]
+    if (!currentBoard || currentBoard.id !== boardId) {
+      return
+    }
+
+    try {
+      const columnsResponse = await httpClient.get(`/retro/boards/${boardId}/columns`)
+      currentBoard.columns = this.normalizeColumns(columnsResponse.data)
+      this.board = [{ ...currentBoard }]
+      this.setLastSyncedPositions()
+    } catch (error) {
+      console.error('[retro] failed to load board columns', boardId, error)
     }
   },
   async updateBoardName(this: TBoardActionsContext, boardId: number, name: string) {

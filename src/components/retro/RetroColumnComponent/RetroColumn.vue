@@ -226,7 +226,7 @@
 </style>
 
 <script setup lang="ts">
-import { ref, computed } from 'vue'
+import { ref, computed, toRef } from 'vue'
 import { Sortable } from 'sortablejs-vue3'
 import { type TRetroColumn, type TRetroColumnColor } from '@/stores/RetroStore'
 import SvgIcon from '@/components/common/SvgIcon/SvgIcon.vue'
@@ -241,7 +241,7 @@ const props = defineProps<{
   column: TRetroColumn
 }>()
 
-const { column } = props
+const column = toRef(props, 'column')
 const menuButtonRef = ref<HTMLElement | null>(null)
 const isMenuOpen = ref(false)
 const isDeleteColumnModalOpen = ref(false)
@@ -249,9 +249,11 @@ const isEditColumnModalOpen = ref(false)
 const isEditDescriptionModalOpen = ref(false)
 const nameDraft = ref('')
 const descriptionDraft = ref('')
-const sortableKey = computed(() => `${column.id}:${column.items.map((item) => item.id).join(',')}`)
+const sortableKey = computed(
+  () => `${column.value.id}:${column.value.items.map((item) => item.id).join(',')}`,
+)
 const isCardFilterActive = computed(() => retroStore.getHasCardSearchQuery)
-const filteredItems = computed(() => retroStore.getFilteredColumnItems(column.id))
+const filteredItems = computed(() => retroStore.getFilteredColumnItems(column.value.id))
 const defaultColumnColor: TRetroColumnColor = {
   columnColor: '#f0f0f0',
   itemColor: '#f0f0f0',
@@ -260,7 +262,7 @@ const defaultColumnColor: TRetroColumnColor = {
 
 const options = {
   group: 'shared',
-  draggable: '.card-container:not(.card-container-is-editing):not(.card-container-comments-open)',
+  draggable: '.card-container:not(.card-container-is-editing)',
   animation: 150,
   swapThreshold: 0.65,
   emptyInsertThreshold: 20,
@@ -278,7 +280,7 @@ const closeMenu = () => {
 
 const onEditColumnClick = () => {
   closeMenu()
-  nameDraft.value = column.name
+  nameDraft.value = column.value.name
   isEditColumnModalOpen.value = true
 }
 
@@ -287,14 +289,14 @@ const onCloseEditColumnModal = () => {
 }
 
 const onConfirmEditColumn = (value: string) => {
-  retroStore.updateColumnName(column.id, value)
-  retroStore.updateColumnNameEnd(column.id)
+  retroStore.updateColumnName(column.value.id, value)
+  retroStore.updateColumnNameEnd(column.value.id)
   isEditColumnModalOpen.value = false
 }
 
 const onEditDescriptionClick = () => {
   closeMenu()
-  descriptionDraft.value = column.description ?? ''
+  descriptionDraft.value = column.value.description ?? ''
   isEditDescriptionModalOpen.value = true
 }
 
@@ -303,13 +305,13 @@ const onCloseEditDescriptionModal = () => {
 }
 
 const onConfirmEditDescription = (value: string) => {
-  retroStore.updateColumnDescription(column.id, value)
+  retroStore.updateColumnDescription(column.value.id, value)
   isEditDescriptionModalOpen.value = false
 }
 
 const onCopyNameClick = async () => {
   closeMenu()
-  const textToCopy = column.name.trim()
+  const textToCopy = column.value.name.trim()
   if (!textToCopy) return
 
   try {
@@ -320,11 +322,11 @@ const onCopyNameClick = async () => {
 }
 
 const onSetColumnColor = (color: TRetroColumnColor) => {
-  retroStore.updateColumnColor(column.id, color)
+  retroStore.updateColumnColor(column.value.id, color)
 }
 
 const onRemoveColumnColor = () => {
-  retroStore.updateColumnColor(column.id, defaultColumnColor)
+  retroStore.updateColumnColor(column.value.id, defaultColumnColor)
 }
 
 const onDeleteColumn = () => {
@@ -338,7 +340,7 @@ const onCloseDeleteColumnModal = () => {
 
 const onConfirmDeleteColumn = () => {
   isDeleteColumnModalOpen.value = false
-  retroStore.deleteColumn(column.id)
+  retroStore.deleteColumn(column.value.id)
 }
 
 const onColumnChoose = (event: any) => {
@@ -349,7 +351,7 @@ const onColumnAdd = (event: any) => {
   const movedItemId = Number((event.item as HTMLElement | null)?.id)
   if (!Number.isFinite(movedItemId) || movedItemId <= 0) return
 
-  retroStore.moveItemByIdToColumn(movedItemId, column.id, event.newIndex)
+  retroStore.moveItemByIdToColumn(movedItemId, column.value.id, event.newIndex)
   retroStore.setActiveItemId(null)
 }
 
@@ -357,11 +359,11 @@ const onColumnUpdate = (event: any) => {
   const movedItemId = Number((event.item as HTMLElement | null)?.id)
   if (!Number.isFinite(movedItemId) || movedItemId <= 0) return
 
-  retroStore.moveItemByIdToColumn(movedItemId, column.id, event.newIndex)
+  retroStore.moveItemByIdToColumn(movedItemId, column.value.id, event.newIndex)
   retroStore.setActiveItemId(null)
 }
 
 const onAddItemClick = () => {
-  retroStore.addItemToColumn(column.id)
+  retroStore.addItemToColumn(column.value.id)
 }
 </script>

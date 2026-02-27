@@ -585,7 +585,9 @@ const isDeleteCardModalOpen = ref(false)
 const isCommentsOpen = ref(false)
 const hasLoadedComments = ref(false)
 const isCommentsLoading = ref(false)
-const comments = ref<RetroItemCommentResponseDto[]>([])
+const comments = computed<RetroItemCommentResponseDto[]>(() => {
+  return retroStore.getItemComments(props.element.id)
+})
 const commentsLoadError = ref('')
 
 const newCommentText = ref('')
@@ -693,9 +695,11 @@ const syncCommentsCount = () => {
   retroStore.setItemCommentsCount(props.element.id, comments.value.length)
 }
 
-const resetCommentsState = () => {
+const resetCommentsState = (itemIdToClear?: number) => {
   commentsLoadRequestId += 1
-  comments.value = []
+  if (typeof itemIdToClear === 'number' && Number.isInteger(itemIdToClear) && itemIdToClear > 0) {
+    retroStore.clearItemCommentsCache(itemIdToClear)
+  }
   commentsLoadError.value = ''
   newCommentText.value = ''
   createCommentError.value = ''
@@ -710,7 +714,7 @@ const resetCommentsState = () => {
 
 const loadComments = async () => {
   if (props.element.isDraft) {
-    comments.value = []
+    retroStore.setCommentsCache(props.element.id, [])
     hasLoadedComments.value = true
     syncCommentsCount()
     return
@@ -721,12 +725,10 @@ const loadComments = async () => {
   commentsLoadError.value = ''
 
   try {
-    const loadedComments = await retroCommentsService.getItemComments(props.element.id)
+    await retroStore.refetchItemComments(props.element.id)
     if (requestId !== commentsLoadRequestId) return
 
-    comments.value = loadedComments
     hasLoadedComments.value = true
-    syncCommentsCount()
   } catch (error) {
     if (requestId !== commentsLoadRequestId) return
 
@@ -743,7 +745,8 @@ const onCommentsToggleClick = (event: MouseEvent) => {
   event.stopPropagation()
 
   isCommentsOpen.value = !isCommentsOpen.value
-  if (!isCommentsOpen.value || hasLoadedComments.value || isCommentsLoading.value) {
+  const hasCache = retroStore.hasItemCommentsCache(props.element.id)
+  if (!isCommentsOpen.value || (hasLoadedComments.value && hasCache) || isCommentsLoading.value) {
     return
   }
 
@@ -759,8 +762,12 @@ watch(
 
 watch(
   () => props.element.id,
-  () => {
-    resetCommentsState()
+  (newId, oldId) => {
+    if (Number.isInteger(oldId) && oldId > 0 && oldId !== newId) {
+      resetCommentsState(oldId)
+    } else {
+      resetCommentsState()
+    }
 
     if (isCommentsOpen.value) {
       void loadComments()
@@ -844,9 +851,8 @@ const onCreateCommentSubmit = async () => {
   try {
     const createdComment = await retroCommentsService.createItemComment(props.element.id, { text })
 
-    comments.value = [...comments.value, createdComment]
+    retroStore.mergeCommentCache(createdComment)
     newCommentText.value = ''
-    syncCommentsCount()
     hasLoadedComments.value = true
   } catch (error) {
     createCommentError.value = getCommentApiErrorMessage(error, 'Не удалось создать комментарий')
@@ -885,10 +891,7 @@ const onSaveEditedComment = async (commentId: number) => {
   try {
     const updatedComment = await retroCommentsService.updateComment(commentId, { text })
 
-    comments.value = comments.value.map((comment) => {
-      if (comment.id !== commentId) return comment
-      return updatedComment
-    })
+    retroStore.mergeCommentCache(updatedComment)
 
     onCancelCommentEditing()
   } catch (error) {
@@ -914,11 +917,10 @@ const onDeleteComment = async (commentId: number) => {
       return
     }
 
-    comments.value = comments.value.filter((comment) => comment.id !== commentId)
+    retroStore.removeCommentFromCache(commentId, props.element.id)
     if (editingCommentId.value === commentId) {
       onCancelCommentEditing()
     }
-    syncCommentsCount()
   } catch (error) {
     commentActionError.value = getCommentApiErrorMessage(error, 'Не удалось удалить комментарий')
   } finally {

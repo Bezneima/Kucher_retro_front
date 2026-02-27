@@ -178,6 +178,7 @@ export const columnActions = {
       description: '',
       color: { ...fallbackColor },
       isNameEditing: false,
+      isDraft: true,
       items: [],
     }
 
@@ -207,6 +208,17 @@ export const columnActions = {
         createdColumn.color = normalizeColumnColorPayload(payload.color, createdColumn.color)
         if (typeof payload.description === 'string') {
           createdColumn.description = payload.description
+        }
+        createdColumn.isDraft = false
+
+        const duplicateIndex = columns.findIndex(
+          (column) => column !== createdColumn && column.id === createdColumn.id,
+        )
+        if (duplicateIndex >= 0) {
+          const createdIndex = columns.findIndex((column) => column === createdColumn)
+          if (createdIndex >= 0) {
+            columns.splice(createdIndex, 1)
+          }
         }
       })
       .catch((error) => {
