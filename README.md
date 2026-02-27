@@ -35,6 +35,22 @@ npm install
 npm run dev
 ```
 
+### Google OAuth (Frontend)
+
+Set these env variables:
+
+```sh
+VITE_RETRO_API_BASE_URL=http://localhost:3000
+VITE_GOOGLE_AUTH_ENABLED=true
+VITE_GOOGLE_AUTH_DEFAULT_RETURN_TO=/teams
+```
+
+Expected backend endpoints:
+
+- `GET /auth/google/start?returnTo=/teams` (redirect to Google)
+- `GET /auth/google/callback` (backend callback, then redirect to frontend callback page)
+- `POST /auth/google/exchange` with `{ "exchangeToken": "..." }` -> `{ "accessToken": "...", "refreshToken": "..." }`
+
 ### Type-Check, Compile and Minify for Production
 
 ```sh

@@ -6,6 +6,7 @@ import RoomPage from '../pages/RoomPage.vue'
 import TeamsPage from '../pages/TeamsPage.vue'
 import ProfilePage from '../pages/ProfilePage.vue'
 import InvitePage from '../pages/InvitePage.vue'
+import GoogleAuthCallbackPage from '../pages/GoogleAuthCallbackPage.vue'
 
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
@@ -50,6 +51,14 @@ const router = createRouter({
       path: '/auth',
       name: 'auth',
       component: AuthPage,
+      meta: {
+        public: true,
+      },
+    },
+    {
+      path: '/auth/google/callback',
+      name: 'auth-google-callback',
+      component: GoogleAuthCallbackPage,
       meta: {
         public: true,
       },
