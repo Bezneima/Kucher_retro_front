@@ -26,7 +26,11 @@
       @delete-card="onDeleteCardClick"
       :cardColor="element.color"
     />
-    <div v-if="cardUiState.showPreview" class="item-text-preview" @click="startEditingOnTextAreaClick">
+    <div
+      v-if="cardUiState.showPreview"
+      class="item-text-preview"
+      @click="startEditingOnTextAreaClick"
+    >
       {{ cardUiState.previewText }}
     </div>
     <textarea
@@ -39,7 +43,10 @@
       @keydown.enter.exact.prevent="saveAndClose"
       @keydown.escape="cancelEditing"
     />
-    <div :class="['card-footer', { 'card-footer-edited': cardUiState.isFooterEdited }]" @click="onFooterClick">
+    <div
+      :class="['card-footer', { 'card-footer-edited': cardUiState.isFooterEdited }]"
+      @click="onFooterClick"
+    >
       <template v-if="cardUiState.showFooterMeta">
         <span v-if="formattedCreatedAt" class="card-footer-date">{{ formattedCreatedAt }}</span>
 
@@ -239,7 +246,7 @@
 }
 
 .item-text-preview {
-  width: calc(100% - 20px);
+  width: calc(100% - 28px);
   min-height: 20px;
   padding: 8px 8px;
   background-color: var(--item-bg, #f0f0f0);
@@ -527,8 +534,8 @@
   position: absolute;
   top: 6px;
   right: 4px;
-  width: 14px;
-  height: 14px;
+  width: 20px;
+  height: 20px;
   display: flex;
   align-items: center;
   justify-content: center;

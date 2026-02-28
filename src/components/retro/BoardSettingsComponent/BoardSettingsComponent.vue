@@ -1,6 +1,26 @@
 <template>
   <section class="board-settings-strip" aria-label="Настройки доски">
     <div class="board-settings-strip-inner">
+      <button
+        type="button"
+        class="board-nav-button board-nav-button--prev"
+        :disabled="!nextBoardId || isBoardNavigationLoading"
+        @click="navigateToBoard(nextBoardId)"
+      >
+        <SvgIcon name="triangleRight" class="board-nav-button__icon" />
+        <span>Прошлая доска</span>
+      </button>
+
+      <button
+        type="button"
+        class="board-nav-button board-nav-button--next"
+        :disabled="!previousBoardId || isBoardNavigationLoading"
+        @click="navigateToBoard(previousBoardId)"
+      >
+        <span>Следующая доска</span>
+        <SvgIcon name="triangleRight" class="board-nav-button__icon" />
+      </button>
+
       <label class="board-search" for="board-card-search-input">
         <input
           id="board-card-search-input"
@@ -18,27 +38,8 @@
         @click="onAddColumnClick"
         title="Добавить колонку"
       >
+        Добавить колонку
         <SvgIcon name="addColumn" class="board-add-column-button__icon" />
-      </button>
-
-      <button
-        type="button"
-        class="board-nav-button board-nav-button--prev"
-        :disabled="!previousBoardId || isBoardNavigationLoading"
-        @click="navigateToBoard(previousBoardId)"
-      >
-        <SvgIcon name="triangleRight" class="board-nav-button__icon" />
-        <span>Следующая доска</span>
-      </button>
-
-      <button
-        type="button"
-        class="board-nav-button board-nav-button--next"
-        :disabled="!nextBoardId || isBoardNavigationLoading"
-        @click="navigateToBoard(nextBoardId)"
-      >
-        <span>Прошлая доска</span>
-        <SvgIcon name="triangleRight" class="board-nav-button__icon" />
       </button>
 
       <button
@@ -256,7 +257,7 @@ watch(
 }
 
 .board-search__label {
-  font-size: 14px;
+  font-size: 12px;
   font-weight: 500;
   color: #566074;
 }
@@ -267,7 +268,7 @@ watch(
   border: 1px solid #c8d4e3;
   border-radius: 8px;
   padding: 0 12px;
-  font-size: 14px;
+  font-size: 12px;
   color: #2f3647;
   background: #fff;
   box-sizing: border-box;
@@ -286,7 +287,7 @@ watch(
   background: #fff;
   color: #2f3647;
   padding: 0 9px;
-  font-size: 14px;
+  font-size: 12px;
   font-weight: 500;
   cursor: pointer;
   display: inline-flex;
@@ -330,7 +331,7 @@ watch(
   background: #fff;
   color: #2f3647;
   padding: 0 10px;
-  font-size: 13px;
+  font-size: 12px;
   font-weight: 500;
   cursor: pointer;
   display: inline-flex;
@@ -360,7 +361,7 @@ watch(
 }
 
 .board-nav-button--next {
-  margin-right: auto;
+  /* margin-right: auto; */
 }
 
 @media (max-width: 768px) {

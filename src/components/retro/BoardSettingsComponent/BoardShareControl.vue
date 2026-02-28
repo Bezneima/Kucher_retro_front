@@ -1,8 +1,5 @@
 <template>
-  <NotificationStack
-    :notifications="notifications"
-    @dismiss="dismissNotification"
-  />
+  <NotificationStack :notifications="notifications" @dismiss="dismissNotification" />
 
   <button
     v-if="canShareBoard"
@@ -18,7 +15,8 @@
   <div
     v-if="boardShareLink.isModalOpen.value"
     class="board-share-modal-overlay"
-    @click.self="onCloseShareModal"
+    @pointerdown="onOverlayPointerDown"
+    @pointerup="onOverlayPointerUp"
   >
     <div class="board-share-modal" role="dialog" aria-modal="true" aria-label="Поделиться доской">
       <button
@@ -32,11 +30,12 @@
 
       <h3 class="board-share-modal-title">Поделиться доской</h3>
 
-      <div v-if="boardShareLink.isLoading.value" class="board-share-state">
-        Получаем ссылку...
-      </div>
+      <div v-if="boardShareLink.isLoading.value" class="board-share-state">Получаем ссылку...</div>
 
-      <div v-else-if="boardShareLink.errorMessage.value" class="board-share-state board-share-state--error">
+      <div
+        v-else-if="boardShareLink.errorMessage.value"
+        class="board-share-state board-share-state--error"
+      >
         <p>{{ boardShareLink.errorMessage.value }}</p>
         <button
           v-if="boardShareLink.canRetry.value"
@@ -80,22 +79,6 @@
           >
             Скопировать ссылку
           </button>
-          <button
-            class="board-share-secondary-button"
-            type="button"
-            :disabled="isShareActionPending"
-            @click="onRegenerateShareLink"
-          >
-            {{ boardShareLink.isRegenerating.value ? 'Обновление...' : 'Обновить ссылку' }}
-          </button>
-          <button
-            class="board-share-danger-button"
-            type="button"
-            :disabled="isShareActionPending"
-            @click="onRevokeShareLink"
-          >
-            {{ boardShareLink.isRevoking.value ? 'Отзыв...' : 'Отозвать ссылку' }}
-          </button>
         </div>
       </div>
     </div>
@@ -103,7 +86,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, ref } from 'vue'
 import { useRetroStore } from '@/stores/RetroStore'
 import { useUiNotifications } from '@/composables/useUiNotifications'
 import NotificationStack from '@/components/teams/NotificationStack.vue'
@@ -121,12 +104,9 @@ const canShareBoard = computed(() => {
 })
 
 const boardShareLink = useBoardShareLink(currentBoardId)
+const isOverlayPointerDown = ref(false)
 const isShareActionPending = computed(() => {
-  return (
-    boardShareLink.isLoading.value ||
-    boardShareLink.isRegenerating.value ||
-    boardShareLink.isRevoking.value
-  )
+  return boardShareLink.isLoading.value
 })
 
 const onShareButtonClick = () => {
@@ -142,7 +122,21 @@ const onCloseShareModal = () => {
     return
   }
 
+  isOverlayPointerDown.value = false
   boardShareLink.closeModal()
+}
+
+const onOverlayPointerDown = (event: PointerEvent) => {
+  const isPrimaryPointer = event.pointerType !== 'mouse' || event.button === 0
+  isOverlayPointerDown.value = event.target === event.currentTarget && isPrimaryPointer
+}
+
+const onOverlayPointerUp = (event: PointerEvent) => {
+  const shouldClose = isOverlayPointerDown.value && event.target === event.currentTarget
+  isOverlayPointerDown.value = false
+  if (shouldClose) {
+    onCloseShareModal()
+  }
 }
 
 const onRetryShareLink = () => {
@@ -158,31 +152,18 @@ const onCopyShareLink = async () => {
 
   pushNotification('error', 'Не удалось скопировать ссылку')
 }
-
-const onRegenerateShareLink = async () => {
-  const nextShareLink = await boardShareLink.regenerateShareLink()
-  if (nextShareLink) {
-    pushNotification('success', 'Ссылка обновлена')
-  }
-}
-
-const onRevokeShareLink = async () => {
-  const isRevoked = await boardShareLink.revokeShareLink()
-  if (isRevoked) {
-    pushNotification('info', 'Ссылка отозвана')
-  }
-}
 </script>
 
 <style scoped>
 .board-share-trigger {
+  margin-left: auto;
   height: 36px;
   border: 1px solid #1e88e5;
   border-radius: 8px;
   background: #1e88e5;
   color: #fff;
   padding: 0 9px;
-  font-size: 14px;
+  font-size: 13px;
   font-weight: 500;
   cursor: pointer;
   display: inline-flex;
@@ -303,8 +284,7 @@ const onRevokeShareLink = async () => {
 }
 
 .board-share-primary-button,
-.board-share-secondary-button,
-.board-share-danger-button {
+.board-share-secondary-button {
   border: 1px solid #ccdaef;
   border-radius: 8px;
   padding: 9px 12px;
@@ -320,14 +300,8 @@ const onRevokeShareLink = async () => {
   color: #fff;
 }
 
-.board-share-danger-button {
-  border-color: #e3b7b7;
-  color: #8c2c2c;
-}
-
 .board-share-primary-button:disabled,
-.board-share-secondary-button:disabled,
-.board-share-danger-button:disabled {
+.board-share-secondary-button:disabled {
   opacity: 0.7;
   cursor: not-allowed;
 }
