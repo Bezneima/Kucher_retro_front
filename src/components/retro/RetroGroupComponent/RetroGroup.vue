@@ -1,50 +1,51 @@
 <template>
   <section
     class="retro-group-container"
+    :class="{ 'retro-group-container-drag-hover': isDragHandleHovered }"
     :style="{
       '--group-bg': group.color.columnColor,
       '--group-item-bg': group.color.itemColor,
       '--group-button-bg': group.color.buttonColor,
     }"
   >
-    <header class="retro-group-header group-drag-handle">
-      <p class="retro-group-title">{{ group.name }}</p>
-      <div class="retro-group-actions" @click.stop>
-        <button type="button" class="retro-group-action" title="Название" @click="openNameModal">
-          N
-        </button>
-        <button
-          type="button"
-          class="retro-group-action"
-          title="Описание"
-          @click="openDescriptionModal"
-        >
-          D
-        </button>
-        <button type="button" class="retro-group-action" title="Цвет" @click="toggleColorPicker">
-          C
-        </button>
-        <button type="button" class="retro-group-action" title="Удалить" @click="openDeleteModal">
-          X
-        </button>
-      </div>
+    <header
+      class="retro-group-header group-drag-handle"
+      @mouseenter="onDragHandleMouseEnter"
+      @mouseleave="onDragHandleMouseLeave"
+    >
+      <button
+        type="button"
+        class="retro-group-title"
+        title="Изменить название группы"
+        @mousedown.stop
+        @click="onGroupTitleClick"
+      >
+        {{ group.name }}
+      </button>
+      <button
+        ref="menuButtonRef"
+        type="button"
+        class="retro-group-open-menu-button"
+        title="Открыть меню группы"
+        @click="onMenuButtonClick"
+      >
+        <SvgIcon name="columnMenu" class="retro-group-open-menu-button__icon" />
+      </button>
     </header>
 
     <p v-if="group.description" class="retro-group-description">{{ group.description }}</p>
-
-    <div v-if="isColorPickerOpen" class="retro-group-colors" @click.stop>
-      <button
-        v-for="color in availableColors"
-        :key="color.columnColor"
-        type="button"
-        class="retro-group-color"
-        :style="{ backgroundColor: color.columnColor }"
-        @click="onSelectColor(color)"
-      />
-    </div>
+    <RetroGroupMenu
+      :is-open="isMenuOpen"
+      :anchor-el="menuButtonRef"
+      @close="closeMenu"
+      @edit-name="openNameModal"
+      @edit-description="openDescriptionModal"
+      @set-color="onSelectColor"
+      @delete-group="openDeleteModal"
+    />
 
     <button type="button" class="retro-group-add-item" @click="onAddItemToGroupClick">
-      + Карточка в группу
+      <SvgIcon name="bigplus" class="retro-group-add-item__icon" />
     </button>
 
     <Sortable
@@ -59,11 +60,7 @@
       @update="onGroupItemUpdate"
     >
       <template #item="{ element }">
-        <div
-          class="group-item-draggable"
-          :data-dnd-kind="element.kind"
-          :data-item-id="element.id"
-        >
+        <div class="group-item-draggable" :data-dnd-kind="element.kind" :data-item-id="element.id">
           <RetroColumnItem v-if="itemById[element.id]" :element="itemById[element.id]!" />
         </div>
       </template>
@@ -102,11 +99,12 @@ import { Sortable } from 'sortablejs-vue3'
 import { computed, ref, toRef, watch } from 'vue'
 import ConfirmDeleteModal from '@/components/common/ConfirmDeleteModal/ConfirmDeleteModal.vue'
 import TextEditModal from '@/components/common/TextEditModal/TextEditModal.vue'
-import { availableColors } from '@/stores/RetroStore'
+import SvgIcon from '@/components/common/SvgIcon/SvgIcon.vue'
 import type { ColumnColor, TRetroGroup } from '@/stores/RetroStore'
 import { useRetroStore } from '@/stores/RetroStore'
 import { useBoardNotifications } from '@/composables/useBoardNotifications'
 import RetroColumnItem from '../RetroColumItem/RetroColumnItem.vue'
+import RetroGroupMenu from './RetroGroupMenu.vue'
 
 type TGroupItemNode = {
   kind: 'ITEM'
@@ -125,12 +123,14 @@ const { pushNotification } = useBoardNotifications()
 
 const group = toRef(props, 'group')
 const groupItemNodes = ref<TGroupItemNode[]>([])
+const menuButtonRef = ref<HTMLElement | null>(null)
+const isMenuOpen = ref(false)
 const isDeleteModalOpen = ref(false)
 const isNameModalOpen = ref(false)
 const isDescriptionModalOpen = ref(false)
-const isColorPickerOpen = ref(false)
 const groupNameDraft = ref('')
 const groupDescriptionDraft = ref('')
+const isDragHandleHovered = ref(false)
 
 const itemById = computed(() => {
   const map: Record<number, (typeof group.value.items)[number]> = {}
@@ -141,7 +141,9 @@ const itemById = computed(() => {
 })
 
 const itemNodeKey = (node: TGroupItemNode) => `${node.kind}:${node.id}`
-const groupSortableKey = computed(() => groupItemNodes.value.map((node) => itemNodeKey(node)).join('|'))
+const groupSortableKey = computed(() =>
+  groupItemNodes.value.map((node) => itemNodeKey(node)).join('|'),
+)
 
 watch(
   () => group.value.items.map((item) => item.id).join(','),
@@ -181,11 +183,7 @@ const onMoveItemToGroup = async (event: { item: HTMLElement; newIndex?: number }
   const toColumnId = Number(evt.to?.dataset?.columnId)
   const fromGroupId = Number(evt.from?.dataset?.groupId)
   const toGroupId = Number(evt.to?.dataset?.groupId)
-  if (
-    oldIndex === newIndex &&
-    fromColumnId === toColumnId &&
-    fromGroupId === toGroupId
-  ) {
+  if (oldIndex === newIndex && fromColumnId === toColumnId && fromGroupId === toGroupId) {
     return
   }
 
@@ -212,6 +210,23 @@ const onGroupItemAdd = (event: any) => {
 
 const onGroupItemUpdate = (event: any) => {
   void onMoveItemToGroup(event)
+}
+
+const onMenuButtonClick = (event: MouseEvent) => {
+  event.preventDefault()
+  event.stopPropagation()
+  isMenuOpen.value = !isMenuOpen.value
+}
+
+const onGroupTitleClick = (event: MouseEvent) => {
+  event.preventDefault()
+  event.stopPropagation()
+  closeMenu()
+  openNameModal()
+}
+
+const closeMenu = () => {
+  isMenuOpen.value = false
 }
 
 const openDeleteModal = () => {
@@ -282,13 +297,7 @@ const onConfirmDescription = async (nextValue: string) => {
   }
 }
 
-const toggleColorPicker = () => {
-  isColorPickerOpen.value = !isColorPickerOpen.value
-}
-
 const onSelectColor = async (color: ColumnColor) => {
-  isColorPickerOpen.value = false
-
   try {
     await retroStore.updateGroupColor(group.value.id, color)
   } catch (error) {
@@ -311,16 +320,35 @@ const onAddItemToGroupClick = () => {
     pushNotification('error', 'Ошибка группы', message)
   }
 }
+
+const onDragHandleMouseEnter = () => {
+  isDragHandleHovered.value = true
+}
+
+const onDragHandleMouseLeave = () => {
+  isDragHandleHovered.value = false
+}
 </script>
 
 <style scoped>
 .retro-group-container {
   --item-bg: var(--group-item-bg);
   background: color-mix(in srgb, var(--group-bg) 90%, #ffffff);
-  border: 1px solid color-mix(in srgb, var(--group-bg) 76%, #000);
+  box-shadow:
+    0 1px 2px rgb(15 23 42 / 14%),
+    0 6px 14px -8px rgb(15 23 42 / 42%);
   border-radius: 12px;
-  margin-top: 16px;
+  margin: 16px 2px 0;
   padding: 10px;
+  position: relative;
+  z-index: 1;
+  transition:
+    transform 0.18s ease,
+    box-shadow 0.18s ease;
+}
+
+.retro-group-container-drag-hover {
+  transform: translateY(-2px);
 }
 
 .retro-group-header {
@@ -333,47 +361,51 @@ const onAddItemToGroupClick = () => {
 
 .retro-group-title {
   margin: 0;
-  font-size: 13px;
+  padding: 0;
+  border: none;
+  background: transparent;
+  font-size: 14px;
   font-weight: 700;
-  color: #1f2a3d;
+  color: #7a7a7a;
+  cursor: text;
+  text-align: left;
 }
 
-.retro-group-actions {
+.retro-group-title:focus-visible {
+  outline: 2px solid #6b8fd6;
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+.retro-group-open-menu-button {
+  width: 16px;
+  height: 16px;
+  padding: 4px;
+  border: none;
+  border-radius: 4px;
+  background: transparent;
+  cursor: pointer;
   display: flex;
   align-items: center;
-  gap: 4px;
+  justify-content: center;
+  color: #7a7a7a;
 }
 
-.retro-group-action {
-  width: 22px;
-  height: 22px;
-  border: 1px solid #6d7a91;
-  border-radius: 6px;
-  font-size: 10px;
-  background: #fff;
-  cursor: pointer;
+.retro-group-open-menu-button:hover {
+  background-color: color-mix(in srgb, var(--group-bg) 80%, black);
+}
+
+.retro-group-open-menu-button__icon {
+  width: 100%;
+  height: 100%;
+  display: block;
 }
 
 .retro-group-description {
   margin: 8px 0 0;
-  color: #243044;
+  color: #7a7a7a;
   font-size: 12px;
   white-space: pre-wrap;
-}
-
-.retro-group-colors {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-  margin-top: 8px;
-}
-
-.retro-group-color {
-  width: 20px;
-  height: 20px;
-  border: 1px solid #4c5970;
-  border-radius: 6px;
-  cursor: pointer;
 }
 
 .retro-group-add-item {
@@ -383,9 +415,19 @@ const onAddItemToGroupClick = () => {
   border-radius: 8px;
   height: 32px;
   background: transparent;
-  color: #2d3a52;
+  color: var(--group-button-bg);
   font-size: 12px;
   cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.retro-group-add-item__icon {
+  width: 20px !important;
+  height: 20px !important;
+  stroke-width: 5px !important;
+  display: block;
 }
 
 .retro-group-items {
@@ -394,5 +436,10 @@ const onAddItemToGroupClick = () => {
 
 .group-item-draggable {
   margin-top: 8px;
+}
+
+.group-item-draggable:focus,
+.group-item-draggable:focus-visible {
+  outline: none;
 }
 </style>

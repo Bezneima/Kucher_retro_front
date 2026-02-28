@@ -14,7 +14,7 @@
           title="Перетащите для изменения порядка колонки"
           @click.stop
         >
-          <img src="@/assets/icons/svg/moveColumn.svg" alt="" class="column-drag-handle__icon" />
+          <SvgIcon name="moveColumn" class="column-drag-handle__icon" />
         </span>
 
         <span
@@ -23,7 +23,7 @@
           type="button"
           @click="onMenuButtonClick"
         >
-          <img src="@/assets/icons/svg/columnMenu.svg" alt="" class="column-drag-handle__icon" />
+          <SvgIcon name="columnMenu" class="column-open-menu-button__icon" />
         </span>
       </div>
       <div class="column-header__title-container">
@@ -38,6 +38,7 @@
         @edit-column="onEditColumnClick"
         @edit-description="onEditDescriptionClick"
         @copy-name="onCopyNameClick"
+        @create-group="onCreateGroupClick"
         @set-color="onSetColumnColor"
         @remove-color="onRemoveColumnColor"
         @delete-column="onDeleteColumn"
@@ -45,61 +46,75 @@
       <button class="column-add-button" type="button" @click="onAddItemClick">
         <SvgIcon name="bigplus" class="column-add-button__icon" />
       </button>
-      <button class="column-create-group-button" type="button" @click="onCreateGroupClick">
-        Создать группу
-      </button>
     </div>
 
-    <Sortable
-      v-if="!isCardFilterActive"
-      :key="rootSortableKey"
-      :list="rootNodes"
-      :item-key="rootNodeKey"
-      class="sortable-container"
-      :data-column-id="column.id"
-      :data-container-kind="'ROOT'"
-      :options="rootSortableOptions"
-      @add="onRootAdd"
-      @update="onRootUpdate"
+    <div
+      :class="[
+        'sortable-scroll-area',
+        {
+          'sortable-scroll-area--top-shadow': showTopScrollShadow,
+          'sortable-scroll-area--bottom-shadow': showBottomScrollShadow,
+        },
+      ]"
     >
-      <template #item="{ element }">
-        <div
-          v-if="element.kind === 'ITEM'"
-          class="root-entry-draggable root-entry-item-handle"
-          :data-dnd-kind="'ITEM'"
-          :data-item-id="element.id"
+      <div class="sortable-scroll-shadow sortable-scroll-shadow--top"></div>
+      <div class="sortable-scroll-shadow sortable-scroll-shadow--bottom"></div>
+      <div ref="scrollContainerRef" class="sortable-container" @scroll="onScrollContainer">
+        <Sortable
+          v-if="!isCardFilterActive"
+          :key="rootSortableKey"
+          :list="rootNodes"
+          :item-key="rootNodeKey"
+          class="sortable-content"
+          :data-column-id="column.id"
+          :data-container-kind="'ROOT'"
+          :options="rootSortableOptions"
+          @add="onRootAdd"
+          @update="onRootUpdate"
         >
-          <RetroColumnItem v-if="rootItemById[element.id]" :element="rootItemById[element.id]!" />
-        </div>
+          <template #item="{ element }">
+            <div
+              v-if="element.kind === 'ITEM'"
+              class="root-entry-draggable root-entry-item-handle"
+              :data-dnd-kind="'ITEM'"
+              :data-item-id="element.id"
+            >
+              <RetroColumnItem
+                v-if="rootItemById[element.id]"
+                :element="rootItemById[element.id]!"
+              />
+            </div>
 
-        <div
-          v-else
-          class="root-entry-draggable"
-          :data-dnd-kind="'GROUP'"
-          :data-group-id="element.id"
-        >
-          <RetroGroup
-            v-if="groupById[element.id]"
-            :group="groupById[element.id]!"
-            :column-id="column.id"
-            :dnd-enabled="true"
-            :dnd-group-name="mixedDndGroupName"
-          />
-        </div>
-      </template>
-    </Sortable>
+            <div
+              v-else
+              class="root-entry-draggable"
+              :data-dnd-kind="'GROUP'"
+              :data-group-id="element.id"
+            >
+              <RetroGroup
+                v-if="groupById[element.id]"
+                :group="groupById[element.id]!"
+                :column-id="column.id"
+                :dnd-enabled="true"
+                :dnd-group-name="mixedDndGroupName"
+              />
+            </div>
+          </template>
+        </Sortable>
 
-    <div v-else class="sortable-container">
-      <template v-for="entry in filteredEntries" :key="getEntryKey(entry)">
-        <RetroColumnItem v-if="entry.type === 'ITEM'" :element="entry.item" />
-        <RetroGroup
-          v-else
-          :group="entry.group"
-          :column-id="column.id"
-          :dnd-enabled="false"
-          :dnd-group-name="mixedDndGroupName"
-        />
-      </template>
+        <template v-else>
+          <template v-for="entry in filteredEntries" :key="getEntryKey(entry)">
+            <RetroColumnItem v-if="entry.type === 'ITEM'" :element="entry.item" />
+            <RetroGroup
+              v-else
+              :group="entry.group"
+              :column-id="column.id"
+              :dnd-enabled="false"
+              :dnd-group-name="mixedDndGroupName"
+            />
+          </template>
+        </template>
+      </div>
     </div>
 
     <ConfirmDeleteModal
@@ -130,7 +145,7 @@
 
 <script setup lang="ts">
 import { Sortable } from 'sortablejs-vue3'
-import { computed, ref, toRef, watch } from 'vue'
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, toRef, watch } from 'vue'
 import type { TRetroColumn, TRetroColumnColor, TRetroColumnEntry } from '@/stores/RetroStore'
 import { useRetroStore } from '@/stores/RetroStore'
 import { useBoardNotifications } from '@/composables/useBoardNotifications'
@@ -164,12 +179,40 @@ const isEditDescriptionModalOpen = ref(false)
 const nameDraft = ref('')
 const descriptionDraft = ref('')
 const rootNodes = ref<TRootNode[]>([])
+const scrollContainerRef = ref<HTMLElement | null>(null)
+const showTopScrollShadow = ref(false)
+const showBottomScrollShadow = ref(false)
+const BOTTOM_SCROLL_SPACER_PX = 16
 
 const rootNodeKey = (node: TRootNode) => `${node.kind}:${node.id}`
 const rootSortableKey = computed(() => rootNodes.value.map((node) => rootNodeKey(node)).join('|'))
 
 const isCardFilterActive = computed(() => retroStore.getHasCardSearchQuery)
 const filteredEntries = computed(() => retroStore.getFilteredColumnEntries(column.value.id))
+
+const updateScrollShadows = () => {
+  const container = scrollContainerRef.value
+  if (!container) {
+    showTopScrollShadow.value = false
+    showBottomScrollShadow.value = false
+    return
+  }
+
+  const maxScrollTop = container.scrollHeight - container.clientHeight
+  const effectiveScrollableHeight = maxScrollTop - BOTTOM_SCROLL_SPACER_PX
+  showTopScrollShadow.value = container.scrollTop > 1
+  showBottomScrollShadow.value = effectiveScrollableHeight > 1 && container.scrollTop < effectiveScrollableHeight - 1
+}
+
+const syncScrollShadows = () => {
+  void nextTick(() => {
+    updateScrollShadows()
+  })
+}
+
+const onScrollContainer = () => {
+  updateScrollShadows()
+}
 
 const rootItemById = computed(() => {
   const items = column.value.entries
@@ -186,15 +229,35 @@ const groupById = computed(() => {
 })
 
 watch(
-  () => column.value.entries.map((entry) => `${entry.type}:${entry.type === 'ITEM' ? entry.item.id : entry.group.id}`).join(','),
+  () =>
+    column.value.entries
+      .map((entry) => `${entry.type}:${entry.type === 'ITEM' ? entry.item.id : entry.group.id}`)
+      .join(','),
   () => {
     rootNodes.value = column.value.entries.map((entry) => ({
       kind: entry.type,
       id: entry.type === 'ITEM' ? entry.item.id : entry.group.id,
     }))
+    syncScrollShadows()
   },
   { immediate: true },
 )
+
+watch(
+  () => [isCardFilterActive.value, filteredEntries.value.length],
+  () => {
+    syncScrollShadows()
+  },
+)
+
+onMounted(() => {
+  syncScrollShadows()
+  window.addEventListener('resize', updateScrollShadows)
+})
+
+onBeforeUnmount(() => {
+  window.removeEventListener('resize', updateScrollShadows)
+})
 
 const defaultColumnColor: TRetroColumnColor = {
   columnColor: '#f0f0f0',
@@ -416,7 +479,7 @@ const onCreateGroupClick = async () => {
   font-size: 18px;
   font-weight: 500;
   line-height: 1.4;
-  color: #000000a8;
+  color: #7a7a7a;
   cursor: pointer;
 }
 
@@ -425,6 +488,7 @@ const onCreateGroupClick = async () => {
   display: flex;
   align-items: center;
   justify-content: center;
+  color: #7a7a7a;
   cursor: grab;
   padding: 4px;
   border-radius: 4px;
@@ -449,6 +513,7 @@ const onCreateGroupClick = async () => {
 .column-open-menu-button {
   width: 16px;
   height: 16px;
+  color: #7a7a7a;
   padding: 4px;
   border-radius: 4px;
   cursor: pointer;
@@ -464,15 +529,14 @@ const onCreateGroupClick = async () => {
   display: block;
 }
 
-.column-add-button,
-.column-create-group-button {
+.column-add-button {
   margin-top: 12px;
   width: 100%;
   height: 42px;
-  border: 2px dashed var(--button-bg);
+  border: 2px dashed var(--item-bg);
   border-radius: 10px;
   background-color: transparent;
-  color: var(--button-bg);
+  color: var(--item-bg);
   cursor: pointer;
   display: flex;
   align-items: center;
@@ -481,10 +545,10 @@ const onCreateGroupClick = async () => {
   gap: 6px;
 }
 
-.column-add-button:hover,
-.column-create-group-button:hover {
-  border-color: color-mix(in srgb, var(--button-bg) 80%, black);
-  color: color-mix(in srgb, var(--button-bg) 80%, black);
+.column-add-button:hover {
+  border-color: color-mix(in srgb, var(--item-bg) 85%, black);
+  color: color-mix(in srgb, var(--item-bg) 85%, black);
+  background-color: color-mix(in srgb, var(--item-bg) 40%, transparent);
 }
 
 .column-add-button__icon {
@@ -503,13 +567,99 @@ const onCreateGroupClick = async () => {
   margin-top: 6px;
 }
 
-.sortable-container {
+.sortable-scroll-area {
   flex: 1;
   min-height: 0;
+  position: relative;
+  margin-top: 16px;
+}
+
+.sortable-scroll-shadow {
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 21px;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.16s ease;
+  z-index: 5;
+}
+
+.sortable-scroll-shadow--top {
+  top: 0;
+  background: linear-gradient(
+    to bottom,
+    rgb(15 23 42 / 16%),
+    rgb(15 23 42 / 6%),
+    rgb(15 23 42 / 0%)
+  );
+}
+
+.sortable-scroll-shadow--bottom {
+  bottom: 0;
+  background: linear-gradient(to top, rgb(15 23 42 / 16%), rgb(15 23 42 / 6%), rgb(15 23 42 / 0%));
+}
+
+.sortable-container {
+  height: 100%;
   overflow-y: auto;
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+.sortable-container::after {
+  content: '';
+  display: block;
+  height: 16px;
+  background: transparent;
+}
+
+.sortable-container::-webkit-scrollbar {
+  width: 0;
+  height: 0;
+}
+
+.sortable-content {
+  min-height: 100%;
+}
+
+.sortable-scroll-area--top-shadow .sortable-scroll-shadow--top {
+  opacity: 1;
+}
+
+.sortable-scroll-area--bottom-shadow .sortable-scroll-shadow--bottom {
+  opacity: 1;
 }
 
 .root-entry-item-handle {
   margin-top: 16px;
+}
+
+.sortable-content > :first-child.root-entry-item-handle {
+  margin-top: 0;
+}
+
+.sortable-content > :first-child .retro-group-container {
+  margin-top: 0;
+}
+
+.root-entry-draggable:focus,
+.root-entry-draggable:focus-visible {
+  outline: none;
+}
+
+.sortable-container > .card-container {
+  margin-top: 16px;
+}
+
+.sortable-container > .card-container:first-child,
+.sortable-container > .retro-group-container:first-child {
+  margin-top: 0;
+}
+
+@media (min-width: 769px) {
+  .column {
+    max-height: 800px;
+  }
 }
 </style>

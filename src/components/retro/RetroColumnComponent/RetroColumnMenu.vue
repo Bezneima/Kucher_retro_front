@@ -16,6 +16,7 @@
         @edit-column="onEditColumnClick"
         @edit-description="onEditDescriptionClick"
         @copy-name="onCopyNameClick"
+        @create-group="onCreateGroupClick"
         @open-color-menu="openColorMenu"
         @remove-color="onRemoveColorClick"
         @delete-column="onDeleteColumnClick"
@@ -42,6 +43,7 @@ const emit = defineEmits<{
   editColumn: []
   editDescription: []
   copyName: []
+  createGroup: []
   setColor: [color: TRetroColumnColor]
   removeColor: []
   deleteColumn: []
@@ -141,6 +143,11 @@ const onEditColumnClick = () => {
 
 const onCopyNameClick = () => {
   emit('copyName')
+  emit('close')
+}
+
+const onCreateGroupClick = () => {
+  emit('createGroup')
   emit('close')
 }
 

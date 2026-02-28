@@ -11,6 +11,10 @@
     <img src="@/assets/icons/svg/copy.svg" alt="" class="retro-item-menu-button__icon" />
     Копировать название
   </button>
+  <button class="retro-item-menu-button" type="button" @click="onCreateGroupClick">
+    <img src="@/assets/icons/svg/addColumn.svg" alt="" class="retro-item-menu-button__icon" />
+    Создать группу
+  </button>
   <button class="retro-item-menu-button" type="button" @click="onOpenColorMenuClick">
     <img src="@/assets/icons/svg/fill.svg" alt="" class="retro-item-menu-button__icon" />
     Установить цвет колонки
@@ -41,6 +45,7 @@ const emit = defineEmits<{
   editColumn: []
   editDescription: []
   copyName: []
+  createGroup: []
   openColorMenu: []
   removeColor: []
   deleteColumn: []
@@ -53,6 +58,7 @@ const props = defineProps<{
 const onEditColumnClick = () => emit('editColumn')
 const onEditDescriptionClick = () => emit('editDescription')
 const onCopyNameClick = () => emit('copyName')
+const onCreateGroupClick = () => emit('createGroup')
 const onOpenColorMenuClick = () => emit('openColorMenu')
 const onRemoveColorClick = () => emit('removeColor')
 const onDeleteColumnClick = () => emit('deleteColumn')

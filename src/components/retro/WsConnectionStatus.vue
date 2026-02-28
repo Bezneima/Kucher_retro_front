@@ -13,13 +13,13 @@ onMounted(() => {
 })
 </script>
 
-<template>
+<!-- <template>
   <section class="ws-status" aria-live="polite">
     <p><strong>WS status:</strong> {{ status }}</p>
     <p><strong>Last message:</strong> {{ lastMessage || '-' }}</p>
     <p v-if="errorMessage"><strong>Error:</strong> {{ errorMessage }}</p>
   </section>
-</template>
+</template> -->
 
 <style scoped>
 .ws-status {

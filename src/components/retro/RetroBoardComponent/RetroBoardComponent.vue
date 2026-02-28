@@ -52,7 +52,7 @@
 }
 
 .board-columns {
-  --columns-gap: 30px;
+  --columns-gap: 16px;
   --visible-columns: 1;
   --board-column-width: calc(
     (100% - (var(--columns-gap) * (var(--visible-columns) - 1))) / var(--visible-columns)

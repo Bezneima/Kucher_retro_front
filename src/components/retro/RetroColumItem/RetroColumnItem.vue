@@ -81,8 +81,27 @@
         </div>
       </template>
     </div>
+    <button
+      v-if="!isCommentsOpen && cardUiState.showFooterMeta && element.commentsCount > 0"
+      type="button"
+      class="card-show-comments-hint"
+      @click="onCommentsToggleClick"
+      @mousedown.stop
+      @pointerdown.stop
+      @touchstart.stop
+    >
+      <SvgIcon name="ArrowsDown" class="card-show-comments-hint-icon" />
+      Показать комментарии
+    </button>
 
-    <section v-if="isCommentsOpen" class="card-comments" @click.stop @mousedown.stop>
+    <section
+      v-if="isCommentsOpen"
+      class="card-comments"
+      @click.stop
+      @mousedown.stop
+      @pointerdown.stop
+      @touchstart.stop
+    >
       <p v-if="element.isDraft" class="card-comments-state">
         Сначала сохраните карточку, чтобы работать с комментариями.
       </p>
@@ -98,6 +117,9 @@
               rows="3"
               placeholder="Добавьте комментарий"
               :disabled="isCreateCommentPending"
+              @mousedown.stop
+              @pointerdown.stop
+              @touchstart.stop
             />
             <p v-if="createCommentError" class="card-comments-error">{{ createCommentError }}</p>
             <button
@@ -113,15 +135,49 @@
           <p v-else-if="comments.length === 0" class="card-comments-empty">Комментариев пока нет</p>
 
           <ul v-else class="card-comments-list">
-            <li v-for="comment in comments" :key="comment.id" class="card-comment-item">
+            <li
+              v-for="(comment, commentIndex) in comments"
+              :key="comment.id"
+              class="card-comment-item"
+            >
+              <div v-if="commentIndex > 0" class="card-comment-divider" aria-hidden="true" />
+
               <div class="card-comment-meta">
                 <span class="card-comment-author">{{ getCommentAuthor(comment) }}</span>
                 <span class="card-comment-date">{{ formatCommentDate(comment.createdAt) }}</span>
               </div>
 
-              <p v-if="editingCommentId !== comment.id" class="card-comment-text">
-                {{ comment.text }}
-              </p>
+              <div v-if="editingCommentId !== comment.id" class="card-comment-body">
+                <p class="card-comment-text">
+                  {{ comment.text }}
+                </p>
+
+                <div
+                  v-if="canEditComment(comment) || canDeleteComment(comment)"
+                  class="card-comment-actions"
+                >
+                  <button
+                    v-if="canEditComment(comment)"
+                    type="button"
+                    class="card-comment-action-button card-comment-action-button-icon-only"
+                    aria-label="Редактировать комментарий"
+                    :disabled="isAnyCommentActionPending"
+                    @click="onStartCommentEditing(comment)"
+                  >
+                    <SvgIcon name="pencil" class="card-comment-action-icon" />
+                  </button>
+                  <button
+                    v-if="canDeleteComment(comment)"
+                    type="button"
+                    class="card-comment-action-button card-comment-action-button-icon-only"
+                    aria-label="Удалить комментарий"
+                    :disabled="isAnyCommentActionPending"
+                    @click="onDeleteComment(comment.id)"
+                  >
+                    <SvgIcon name="trash" class="card-comment-action-icon" />
+                  </button>
+                </div>
+              </div>
 
               <div v-else class="card-comment-edit-form">
                 <textarea
@@ -129,6 +185,9 @@
                   class="card-comment-edit-textarea"
                   rows="3"
                   :disabled="isCommentUpdating(comment.id)"
+                  @mousedown.stop
+                  @pointerdown.stop
+                  @touchstart.stop
                 />
                 <div class="card-comment-edit-actions">
                   <button
@@ -156,35 +215,6 @@
               >
                 {{ editingCommentError }}
               </p>
-
-              <div
-                v-if="
-                  (canEditComment(comment) || canDeleteComment(comment)) &&
-                  editingCommentId !== comment.id
-                "
-                class="card-comment-actions"
-              >
-                <button
-                  v-if="canEditComment(comment)"
-                  type="button"
-                  class="card-comment-action-button card-comment-action-button-icon-only"
-                  aria-label="Редактировать комментарий"
-                  :disabled="isAnyCommentActionPending"
-                  @click="onStartCommentEditing(comment)"
-                >
-                  <SvgIcon name="pencil" class="card-comment-action-icon" />
-                </button>
-                <button
-                  v-if="canDeleteComment(comment)"
-                  type="button"
-                  class="card-comment-action-button card-comment-action-button-icon-only"
-                  aria-label="Удалить комментарий"
-                  :disabled="isAnyCommentActionPending"
-                  @click="onDeleteComment(comment.id)"
-                >
-                  <SvgIcon name="trash" class="card-comment-action-icon" />
-                </button>
-              </div>
             </li>
           </ul>
 
@@ -208,7 +238,7 @@
 <style scoped>
 .card-container {
   position: relative;
-  margin-top: 16px;
+  margin-top: 0;
   background-color: var(--item-bg, #f0f0f0);
   font-size: 13px;
   font-weight: 400;
@@ -216,8 +246,10 @@
   border-radius: 10px;
   overflow: hidden;
   cursor: grab;
-  border: 2px solid transparent;
   box-sizing: border-box;
+  transition:
+    transform 0.18s ease,
+    box-shadow 0.18s ease;
 }
 
 .card-container-comments-open {
@@ -225,7 +257,10 @@
 }
 
 .card-container:hover {
-  border: 2px solid color-mix(in srgb, var(--item-bg, #f0f0f0) 80%, black);
+  transform: translateY(-2px);
+  box-shadow:
+    0 1px 2px rgb(15 23 42 / 14%),
+    0 6px 14px -8px rgb(15 23 42 / 42%);
 }
 
 .item-textarea {
@@ -303,6 +338,7 @@
   .card-footer-button-icon {
     width: 100%;
     display: block;
+    stroke: none;
   }
 }
 
@@ -343,6 +379,7 @@
   height: 16px;
   display: block;
   flex-shrink: 0;
+  stroke: none;
 }
 
 .card-footer-button-likes-count {
@@ -366,6 +403,31 @@
 .card-footer-button-likes-count-liked {
   color: white;
   font-weight: 600;
+}
+
+.card-show-comments-hint {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  border: 0;
+  background: transparent;
+  color: rgb(255 255 255 / 0.88);
+  font-size: 11px;
+  line-height: 1.2;
+  padding: 0 8px 8px;
+  cursor: pointer;
+}
+
+.card-show-comments-hint-icon {
+  width: 10px;
+  height: 10px;
+  flex-shrink: 0;
+}
+
+.card-show-comments-hint:hover {
+  color: #fff;
 }
 
 .card-comments {
@@ -401,6 +463,12 @@
   gap: 8px;
 }
 
+.card-comment-divider {
+  height: 1px;
+  width: 100%;
+  background: rgb(0 0 0 / 0.18);
+}
+
 .card-comment-meta {
   display: flex;
   align-items: center;
@@ -426,6 +494,13 @@
   color: white;
   white-space: pre-wrap;
   overflow-wrap: anywhere;
+  flex: 1;
+}
+
+.card-comment-body {
+  display: flex;
+  align-items: flex-end;
+  gap: 6px;
 }
 
 .card-comment-actions,
@@ -433,6 +508,11 @@
   display: flex;
   gap: 6px;
   justify-content: flex-end;
+}
+
+.card-comment-actions {
+  align-self: flex-end;
+  flex-shrink: 0;
 }
 
 .card-comment-action-button {
@@ -483,14 +563,22 @@
   width: 100%;
   box-sizing: border-box;
   border: 1px solid #c6d2e6;
-  border-radius: 8px;
+  border-radius: 4px;
   padding: 6px 8px;
   font: inherit;
   font-size: 13px;
   line-height: 1.4;
-  color: #1f2a3d;
+  color: #373737;
   resize: vertical;
   outline: none;
+  box-shadow:
+    0 7px 3px 0 rgba(0, 0, 15, 0.01),
+    0 4px 2px 0 rgba(0, 0, 15, 0.03),
+    0 2px 2px 0 rgba(0, 0, 0, 0.05),
+    0 0 1px 0 rgba(0, 0, 0, 0.06);
+}
+.card-comments-create-textarea::placeholder {
+  color: #c2c2c5;
 }
 
 .card-comment-edit-textarea:disabled,
@@ -501,22 +589,53 @@
 
 .card-comments-create-form {
   display: grid;
-  gap: 6px;
+  gap: 8px;
 }
 
 .card-comments-submit-button {
   justify-self: flex-end;
-  border: 0px;
-  background: color-mix(in srgb, var(--item-bg) 60%, black);
-  color: #fff;
-  border-radius: 8px;
-  padding: 6px 10px;
+  border: 0;
+  background: #fcfcfc;
+  color: var(--item-bg);
+  border-radius: 4px;
+  padding: 6px 16px;
   font-size: 12px;
   cursor: pointer;
+  box-shadow:
+    0 7px 3px 0 rgba(0, 0, 15, 0.01),
+    0 4px 2px 0 rgba(0, 0, 15, 0.03),
+    0 2px 2px 0 rgba(0, 0, 0, 0.05),
+    0 0 1px 0 rgba(0, 0, 0, 0.06);
+}
+
+.card-comment-edit-actions .card-comment-action-button {
+  border: 0;
+  background: #fcfcfc;
+  color: var(--item-bg);
+  border-radius: 4px;
+  padding: 6px 16px;
+  font-size: 12px;
+  box-shadow:
+    0 7px 3px 0 rgba(0, 0, 15, 0.01),
+    0 4px 2px 0 rgba(0, 0, 15, 0.03),
+    0 2px 2px 0 rgba(0, 0, 0, 0.05),
+    0 0 1px 0 rgba(0, 0, 0, 0.06);
+}
+
+.card-comments-submit-button:hover {
+  background: #ebf1ff;
+}
+
+.card-comment-edit-actions .card-comment-action-button:hover {
+  background: #ebf1ff;
 }
 
 .card-comments-submit-button:disabled {
-  opacity: 0.6;
+  /* opacity: 0.6; */
+  cursor: not-allowed;
+}
+
+.card-comment-edit-actions .card-comment-action-button:disabled {
   cursor: not-allowed;
 }
 
@@ -545,6 +664,7 @@
   .open-menu-button-icon {
     width: 12px;
     height: 12px;
+    stroke: none;
     color: white;
     display: block;
   }
@@ -559,7 +679,9 @@
 <style>
 .sortable-chosen {
   cursor: grabbing !important;
-  border: 2px solid color-mix(in srgb, var(--item-bg, #f0f0f0) 60%, black) !important;
+  border: none !important;
+  box-shadow: none !important;
+  outline: none !important;
 }
 </style>
 

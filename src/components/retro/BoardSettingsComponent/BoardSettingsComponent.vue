@@ -292,7 +292,7 @@ watch(
   cursor: pointer;
   display: inline-flex;
   align-items: center;
-  gap: 8px;
+  gap: 4px;
 }
 
 .board-action-button:hover {
