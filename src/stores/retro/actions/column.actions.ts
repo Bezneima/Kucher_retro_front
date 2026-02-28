@@ -48,6 +48,39 @@ const cloneColumns = (columns: TRetroColumn[]): TRetroColumn[] => {
       ...item,
       likes: [...item.likes],
     })),
+    groups: column.groups.map((group) => ({
+      ...group,
+      color: { ...group.color },
+      items: group.items.map((item) => ({
+        ...item,
+        likes: [...item.likes],
+      })),
+    })),
+    entries: column.entries.map((entry) => {
+      if (entry.type === 'ITEM') {
+        return {
+          type: 'ITEM' as const,
+          orderIndex: entry.orderIndex,
+          item: {
+            ...entry.item,
+            likes: [...entry.item.likes],
+          },
+        }
+      }
+
+      return {
+        type: 'GROUP' as const,
+        orderIndex: entry.orderIndex,
+        group: {
+          ...entry.group,
+          color: { ...entry.group.color },
+          items: entry.group.items.map((item) => ({
+            ...item,
+            likes: [...item.likes],
+          })),
+        },
+      }
+    }),
   }))
 }
 
@@ -180,6 +213,8 @@ export const columnActions = {
       isNameEditing: false,
       isDraft: true,
       items: [],
+      groups: [],
+      entries: [],
     }
 
     columns.push(createdColumn)

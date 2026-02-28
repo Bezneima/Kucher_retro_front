@@ -1,34 +1,75 @@
 import type { RetroItemCommentResponseDto } from '@/api/services/retroCommentsService'
 
-export type TRetroColumnItem = {
-  id: number
-  description: string
-  createdAt?: string
-  syncedDescription?: string
-  // users id who liked the item
-  likes: string[]
-  commentsCount: number
-  color?: string
-  isDraft?: boolean
-  columnIndex: number
-  rowIndex: number
-}
-
-export type TRetroColumnColor = {
+export type ColumnColor = {
   columnColor: string
   itemColor: string
   buttonColor: string
 }
 
-export type TRetroColumn = {
+export type RetroItem = {
+  id: number
+  description: string
+  createdAt: string
+  likes: string[]
+  color?: string
+  columnIndex: number
+  rowIndex: number
+  groupId?: number | null
+  commentsCount: number
+  syncedDescription?: string
+  isDraft?: boolean
+}
+
+export type RetroGroup = {
+  id: number
+  columnId: number
+  name: string
+  description: string
+  color: ColumnColor
+  orderIndex: number
+  isNameEditing: boolean
+  items: RetroItem[]
+  isDraft?: boolean
+}
+
+export type RetroColumnEntry =
+  | {
+      type: 'ITEM'
+      orderIndex: number
+      item: RetroItem
+      group?: undefined
+    }
+  | {
+      type: 'GROUP'
+      orderIndex: number
+      group: RetroGroup
+      item?: undefined
+    }
+
+export type RetroColumn = {
   id: number
   name: string
   description: string
-  color: TRetroColumnColor
+  color: ColumnColor
   isNameEditing: boolean
+  items: RetroItem[]
+  groups: RetroGroup[]
+  entries: RetroColumnEntry[]
   isDraft?: boolean
-  items: TRetroColumnItem[]
 }
+
+export type SyncPositionsResult = {
+  boardId: number
+  updated: number
+  changedColumnIds: number[]
+  columns: RetroColumn[]
+}
+
+export type TRetroColumnItem = RetroItem
+export type TRetroColumnColor = ColumnColor
+export type TRetroGroup = RetroGroup
+export type TRetroColumnEntry = RetroColumnEntry
+export type TRetroColumn = RetroColumn
 
 export type TRetroBoard = {
   id: number
@@ -48,19 +89,27 @@ export type TRetroCurrentUser = {
 
 export type TRetroUserBoardRole = 'OWNER' | 'ADMIN' | 'MEMBER'
 
-/** Элемент с изменившейся позицией для отправки на бек */
 export type TItemPositionChange = {
   item: TRetroColumnItem
   oldColumnId: number
+  oldGroupId: number | null
   oldRowIndex: number
   newColumnId: number
+  newGroupId: number | null
   newRowIndex: number
 }
 
 export type TItemPositionPayloadChange = {
   itemId: number
   newColumnId: number
+  newGroupId?: number | null
   newRowIndex: number
+}
+
+export type TGroupPositionPayloadChange = {
+  groupId: number
+  newColumnId: number
+  newOrderIndex: number
 }
 
 export type TRetroBoardState = {
@@ -74,6 +123,5 @@ export type TRetroBoardState = {
   currentUserTeamRole: TRetroUserBoardRole | null
   commentsByItemId: Record<number, RetroItemCommentResponseDto[]>
   commentItemIdByCommentId: Record<number, number>
-  /** Позиции элементов на момент последней синхронизации с беком (или загрузки) */
-  lastSyncedPositions: Record<number, { columnId: number; rowIndex: number }>
+  lastSyncedPositions: Record<number, { columnId: number; groupId: number | null; rowIndex: number }>
 }

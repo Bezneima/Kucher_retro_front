@@ -41,6 +41,42 @@ export const retroGetters = {
       item.description.toLocaleLowerCase().includes(normalizedQuery),
     )
   },
+  getFilteredColumnEntries: (state: TRetroBoardState) => (columnId: number) => {
+    const column = state.board[0]?.columns?.find((entry) => entry.id === columnId)
+    if (!column) return []
+
+    const normalizedQuery = state.cardSearchQuery.trim().toLocaleLowerCase()
+    if (!normalizedQuery || state.board[0]?.isAllCardsHidden) {
+      return column.entries
+    }
+
+    return column.entries
+      .map((entry) => {
+        if (entry.type === 'ITEM') {
+          if (!entry.item.description.toLocaleLowerCase().includes(normalizedQuery)) {
+            return null
+          }
+
+          return entry
+        }
+
+        const filteredItems = entry.group.items.filter((item) =>
+          item.description.toLocaleLowerCase().includes(normalizedQuery),
+        )
+        if (filteredItems.length === 0) {
+          return null
+        }
+
+        return {
+          ...entry,
+          group: {
+            ...entry.group,
+            items: filteredItems,
+          },
+        }
+      })
+      .filter((entry): entry is NonNullable<typeof entry> => Boolean(entry))
+  },
   getIsBoardLoading: (state: TRetroBoardState) => state.isBoardLoading,
   getCurrentUser: (state: TRetroBoardState) => state.currentUser,
   getCurrentUserId: (state: TRetroBoardState) => state.currentUser.id ?? '',

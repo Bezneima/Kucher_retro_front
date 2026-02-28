@@ -11,6 +11,10 @@
     />
     <BoardSettingsComponent />
     <WsConnectionStatus :access-token="accessToken" />
+    <NotificationStack
+      :notifications="notifications"
+      @dismiss="dismissNotification"
+    />
     <p v-if="realtimeSyncError" class="room-realtime-error">{{ realtimeSyncError }}</p>
 
     <section class="room-content">
@@ -87,9 +91,12 @@ import TextEditModal from '@/components/common/TextEditModal/TextEditModal.vue'
 import GlobalHeader from '@/components/teams/GlobalHeader.vue'
 import BoardSettingsComponent from '@/components/retro/BoardSettingsComponent/BoardSettingsComponent.vue'
 import WsConnectionStatus from '@/components/retro/WsConnectionStatus.vue'
+import NotificationStack from '@/components/teams/NotificationStack.vue'
 import { bindRetroSocketListeners } from '@/shared/bindRetroSocketListeners'
 import { connectSocket, joinBoard } from '@/shared/socket'
 import type { ClientToServerEvents, ServerToClientEvents } from '@/shared/ws.types'
+import { provideBoardNotifications } from '@/composables/useBoardNotifications'
+import { useUiNotifications } from '@/composables/useUiNotifications'
 import RetroBoardComponent from '../components/retro/RetroBoardComponent/RetroBoardComponent.vue'
 import Loader from '../components/common/Loader/Loader.vue'
 import { useRetroStore } from '../stores/RetroStore'
@@ -109,9 +116,16 @@ const isBoardNameEditModalOpen = ref(false)
 const isBoardNameUpdating = ref(false)
 const boardNameUpdateError = ref('')
 const realtimeSyncError = ref('')
+const { notifications, pushNotification, dismissNotification } = useUiNotifications()
 let boardSocket: Socket<ServerToClientEvents, ClientToServerEvents> | null = null
 let unsubscribeRetroListeners: (() => void) | null = null
 let boardJoinRequestId = 0
+
+provideBoardNotifications({
+  notifications,
+  pushNotification,
+  dismissNotification,
+})
 
 const openProfile = async () => {
   await router.push({ name: 'profile' })
@@ -208,6 +222,9 @@ const subscribeBoardRealtime = async (boardId: number) => {
       onBoardItemsPositionsSynced: (payload) => {
         retroStore.applyRealtimeBoardItemsPositionsSynced(payload)
       },
+      onBoardGroupsPositionsSynced: (payload) => {
+        retroStore.applyRealtimeBoardGroupsPositionsSynced(payload)
+      },
       onColumnCreated: (payload) => {
         retroStore.applyRealtimeColumnCreated(payload)
       },
@@ -222,6 +239,21 @@ const subscribeBoardRealtime = async (boardId: number) => {
       },
       onColumnDeleted: (payload) => {
         retroStore.applyRealtimeColumnDeleted(payload)
+      },
+      onGroupCreated: (payload) => {
+        retroStore.applyRealtimeGroupCreated(payload)
+      },
+      onGroupNameUpdated: (payload) => {
+        retroStore.applyRealtimeGroupNameUpdated(payload)
+      },
+      onGroupColorUpdated: (payload) => {
+        retroStore.applyRealtimeGroupColorUpdated(payload)
+      },
+      onGroupDescriptionUpdated: (payload) => {
+        retroStore.applyRealtimeGroupDescriptionUpdated(payload)
+      },
+      onGroupDeleted: (payload) => {
+        retroStore.applyRealtimeGroupDeleted(payload)
       },
       onItemCreated: (payload) => {
         retroStore.applyRealtimeItemCreated(payload)

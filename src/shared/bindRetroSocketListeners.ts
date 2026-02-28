@@ -10,6 +10,7 @@ import {
   type WsColumn,
   type WsComment,
   type WsDeletedPayload,
+  type WsGroup,
   type WsItem,
   type WsItemCommentDeletedPayload,
   type WsItemCommentsFetchedPayload,
@@ -19,11 +20,17 @@ export type RetroSocketHandlers = {
   onBoardRenamed: (payload: WsBoard) => void
   onBoardColumnsReordered: (payload: BoardColumnsReorderedEventPayload) => void
   onBoardItemsPositionsSynced: (payload: SyncPositionsPayload) => void
+  onBoardGroupsPositionsSynced: (payload: SyncPositionsPayload) => void
   onColumnCreated: (payload: WsColumn & { boardId: number }) => void
   onColumnNameUpdated: (payload: WsColumn & { boardId: number }) => void
   onColumnColorUpdated: (payload: WsColumn & { boardId: number }) => void
   onColumnDescriptionUpdated: (payload: WsColumn & { boardId: number }) => void
   onColumnDeleted: (payload: WsDeletedPayload & { boardId: number }) => void
+  onGroupCreated: (payload: WsGroup & { boardId?: number }) => void
+  onGroupNameUpdated: (payload: WsGroup & { boardId?: number }) => void
+  onGroupColorUpdated: (payload: WsGroup & { boardId?: number }) => void
+  onGroupDescriptionUpdated: (payload: WsGroup & { boardId?: number }) => void
+  onGroupDeleted: (payload: WsDeletedPayload & WsGroup & { boardId?: number }) => void
   onItemCreated: (payload: WsItem) => void
   onItemDescriptionUpdated: (payload: WsItem) => void
   onItemLikeToggled: (payload: WsItem) => void
@@ -43,11 +50,21 @@ export const bindRetroSocketListeners = (
   socket.on(WS_SERVER_EVENT_NAMES.BOARD_RENAMED, handlers.onBoardRenamed)
   socket.on(WS_SERVER_EVENT_NAMES.BOARD_COLUMNS_REORDERED, handlers.onBoardColumnsReordered)
   socket.on(WS_SERVER_EVENT_NAMES.BOARD_ITEMS_POSITIONS_SYNCED, handlers.onBoardItemsPositionsSynced)
+  socket.on(WS_SERVER_EVENT_NAMES.BOARD_GROUPS_POSITIONS_SYNCED, handlers.onBoardGroupsPositionsSynced)
+  socket.on(
+    WS_SERVER_EVENT_NAMES.BOARD_GROUPS_POSITIONS_SYNCED_COMPAT,
+    handlers.onBoardGroupsPositionsSynced,
+  )
   socket.on(WS_SERVER_EVENT_NAMES.COLUMN_CREATED, handlers.onColumnCreated)
   socket.on(WS_SERVER_EVENT_NAMES.COLUMN_NAME_UPDATED, handlers.onColumnNameUpdated)
   socket.on(WS_SERVER_EVENT_NAMES.COLUMN_COLOR_UPDATED, handlers.onColumnColorUpdated)
   socket.on(WS_SERVER_EVENT_NAMES.COLUMN_DESCRIPTION_UPDATED, handlers.onColumnDescriptionUpdated)
   socket.on(WS_SERVER_EVENT_NAMES.COLUMN_DELETED, handlers.onColumnDeleted)
+  socket.on(WS_SERVER_EVENT_NAMES.GROUP_CREATED, handlers.onGroupCreated)
+  socket.on(WS_SERVER_EVENT_NAMES.GROUP_NAME_UPDATED, handlers.onGroupNameUpdated)
+  socket.on(WS_SERVER_EVENT_NAMES.GROUP_COLOR_UPDATED, handlers.onGroupColorUpdated)
+  socket.on(WS_SERVER_EVENT_NAMES.GROUP_DESCRIPTION_UPDATED, handlers.onGroupDescriptionUpdated)
+  socket.on(WS_SERVER_EVENT_NAMES.GROUP_DELETED, handlers.onGroupDeleted)
   socket.on(WS_SERVER_EVENT_NAMES.ITEM_CREATED, handlers.onItemCreated)
   socket.on(WS_SERVER_EVENT_NAMES.ITEM_DESCRIPTION_UPDATED, handlers.onItemDescriptionUpdated)
   socket.on(WS_SERVER_EVENT_NAMES.ITEM_LIKE_TOGGLED, handlers.onItemLikeToggled)
@@ -69,6 +86,14 @@ export const bindRetroSocketListeners = (
       WS_SERVER_EVENT_NAMES.BOARD_ITEMS_POSITIONS_SYNCED,
       handlers.onBoardItemsPositionsSynced,
     )
+    socket.off(
+      WS_SERVER_EVENT_NAMES.BOARD_GROUPS_POSITIONS_SYNCED,
+      handlers.onBoardGroupsPositionsSynced,
+    )
+    socket.off(
+      WS_SERVER_EVENT_NAMES.BOARD_GROUPS_POSITIONS_SYNCED_COMPAT,
+      handlers.onBoardGroupsPositionsSynced,
+    )
     socket.off(WS_SERVER_EVENT_NAMES.COLUMN_CREATED, handlers.onColumnCreated)
     socket.off(WS_SERVER_EVENT_NAMES.COLUMN_NAME_UPDATED, handlers.onColumnNameUpdated)
     socket.off(WS_SERVER_EVENT_NAMES.COLUMN_COLOR_UPDATED, handlers.onColumnColorUpdated)
@@ -77,6 +102,11 @@ export const bindRetroSocketListeners = (
       handlers.onColumnDescriptionUpdated,
     )
     socket.off(WS_SERVER_EVENT_NAMES.COLUMN_DELETED, handlers.onColumnDeleted)
+    socket.off(WS_SERVER_EVENT_NAMES.GROUP_CREATED, handlers.onGroupCreated)
+    socket.off(WS_SERVER_EVENT_NAMES.GROUP_NAME_UPDATED, handlers.onGroupNameUpdated)
+    socket.off(WS_SERVER_EVENT_NAMES.GROUP_COLOR_UPDATED, handlers.onGroupColorUpdated)
+    socket.off(WS_SERVER_EVENT_NAMES.GROUP_DESCRIPTION_UPDATED, handlers.onGroupDescriptionUpdated)
+    socket.off(WS_SERVER_EVENT_NAMES.GROUP_DELETED, handlers.onGroupDeleted)
     socket.off(WS_SERVER_EVENT_NAMES.ITEM_CREATED, handlers.onItemCreated)
     socket.off(WS_SERVER_EVENT_NAMES.ITEM_DESCRIPTION_UPDATED, handlers.onItemDescriptionUpdated)
     socket.off(WS_SERVER_EVENT_NAMES.ITEM_LIKE_TOGGLED, handlers.onItemLikeToggled)

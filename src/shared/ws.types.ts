@@ -48,6 +48,8 @@ export type WsColumn = {
   description?: string
   color?: unknown
   items?: unknown
+  groups?: unknown
+  entries?: unknown
 }
 
 export type BoardColumnsReorderedEventPayload = {
@@ -63,8 +65,34 @@ export type RetroItemResponseDto = {
   color?: string
   columnIndex?: number
   rowIndex?: number
+  groupId?: number | null
   commentsCount?: number
 }
+
+export type RetroGroupResponseDto = {
+  id: number
+  columnId: number
+  name: string
+  description: string
+  color?: unknown
+  orderIndex?: number
+  isNameEditing?: boolean
+  items: RetroItemResponseDto[]
+}
+
+export type RetroColumnEntryResponseDto =
+  | {
+      type: 'ITEM'
+      orderIndex?: number
+      item: RetroItemResponseDto
+      group?: undefined
+    }
+  | {
+      type: 'GROUP'
+      orderIndex?: number
+      group: RetroGroupResponseDto
+      item?: undefined
+    }
 
 export type RetroColumnResponseDto = {
   id: number
@@ -73,6 +101,8 @@ export type RetroColumnResponseDto = {
   color?: unknown
   isNameEditing?: boolean
   items: RetroItemResponseDto[]
+  groups?: RetroGroupResponseDto[]
+  entries?: RetroColumnEntryResponseDto[]
 }
 
 export type SyncPositionsPayload = {
@@ -88,11 +118,22 @@ export type WsItem = {
   columnId?: number
   columnIndex?: number
   rowIndex?: number
+  groupId?: number | null
   description?: string
   createdAt?: string
   likes?: unknown
   commentsCount?: number
   color?: string
+}
+
+export type WsGroup = {
+  id: number
+  boardId?: number
+  columnId?: number
+  name?: string
+  description?: string
+  color?: unknown
+  orderIndex?: number
 }
 
 export type WsCommentCreator = {
@@ -136,10 +177,6 @@ export type TeamAllCardsVisibilityUpdatedPayload = {
   updatedAt: string
 }
 
-/**
- * Foundation for future realtime migration of board/column/item actions.
- * The server currently guarantees only the built-in "message" event.
- */
 export const WS_DOMAIN_EVENT_NAMES = {
   BOARD_UPDATED: 'board.updated',
   COLUMN_UPDATED: 'column.updated',
@@ -152,17 +189,25 @@ export const WS_CLIENT_EVENT_NAMES = {
   BOARD_JOIN: 'board.join',
   BOARD_RENAME: 'board.rename',
   BOARD_COLUMNS_REORDER: 'board.columns.reorder',
+  BOARD_GROUPS_POSITIONS_SYNC: 'board.groups.positions.sync',
 } as const
 
 export const WS_SERVER_EVENT_NAMES = {
   BOARD_RENAMED: 'retro.board.renamed',
   BOARD_COLUMNS_REORDERED: 'retro.board.columns.reordered',
   BOARD_ITEMS_POSITIONS_SYNCED: 'retro.board.items.positions.synced',
+  BOARD_GROUPS_POSITIONS_SYNCED: 'retro.board.groups.positions.synced',
+  BOARD_GROUPS_POSITIONS_SYNCED_COMPAT: 'board.groups.positions.synced',
   COLUMN_CREATED: 'retro.column.created',
   COLUMN_NAME_UPDATED: 'retro.column.name.updated',
   COLUMN_COLOR_UPDATED: 'retro.column.color.updated',
   COLUMN_DESCRIPTION_UPDATED: 'retro.column.description.updated',
   COLUMN_DELETED: 'retro.column.deleted',
+  GROUP_CREATED: 'retro.group.created',
+  GROUP_NAME_UPDATED: 'retro.group.name.updated',
+  GROUP_COLOR_UPDATED: 'retro.group.color.updated',
+  GROUP_DESCRIPTION_UPDATED: 'retro.group.description.updated',
+  GROUP_DELETED: 'retro.group.deleted',
   ITEM_CREATED: 'retro.item.created',
   ITEM_DESCRIPTION_UPDATED: 'retro.item.description.updated',
   ITEM_LIKE_TOGGLED: 'retro.item.like.toggled',
@@ -183,11 +228,18 @@ export interface ServerToClientEvents {
   [WS_SERVER_EVENT_NAMES.BOARD_RENAMED]: (payload: WsBoard) => void
   [WS_SERVER_EVENT_NAMES.BOARD_COLUMNS_REORDERED]: (payload: BoardColumnsReorderedEventPayload) => void
   [WS_SERVER_EVENT_NAMES.BOARD_ITEMS_POSITIONS_SYNCED]: (payload: SyncPositionsPayload) => void
+  [WS_SERVER_EVENT_NAMES.BOARD_GROUPS_POSITIONS_SYNCED]: (payload: SyncPositionsPayload) => void
+  [WS_SERVER_EVENT_NAMES.BOARD_GROUPS_POSITIONS_SYNCED_COMPAT]: (payload: SyncPositionsPayload) => void
   [WS_SERVER_EVENT_NAMES.COLUMN_CREATED]: (payload: WsColumn & { boardId: number }) => void
   [WS_SERVER_EVENT_NAMES.COLUMN_NAME_UPDATED]: (payload: WsColumn & { boardId: number }) => void
   [WS_SERVER_EVENT_NAMES.COLUMN_COLOR_UPDATED]: (payload: WsColumn & { boardId: number }) => void
   [WS_SERVER_EVENT_NAMES.COLUMN_DESCRIPTION_UPDATED]: (payload: WsColumn & { boardId: number }) => void
   [WS_SERVER_EVENT_NAMES.COLUMN_DELETED]: (payload: WsDeletedPayload & { boardId: number }) => void
+  [WS_SERVER_EVENT_NAMES.GROUP_CREATED]: (payload: WsGroup & { boardId?: number }) => void
+  [WS_SERVER_EVENT_NAMES.GROUP_NAME_UPDATED]: (payload: WsGroup & { boardId?: number }) => void
+  [WS_SERVER_EVENT_NAMES.GROUP_COLOR_UPDATED]: (payload: WsGroup & { boardId?: number }) => void
+  [WS_SERVER_EVENT_NAMES.GROUP_DESCRIPTION_UPDATED]: (payload: WsGroup & { boardId?: number }) => void
+  [WS_SERVER_EVENT_NAMES.GROUP_DELETED]: (payload: WsDeletedPayload & WsGroup & { boardId?: number }) => void
   [WS_SERVER_EVENT_NAMES.ITEM_CREATED]: (payload: WsItem) => void
   [WS_SERVER_EVENT_NAMES.ITEM_DESCRIPTION_UPDATED]: (payload: WsItem) => void
   [WS_SERVER_EVENT_NAMES.ITEM_LIKE_TOGGLED]: (payload: WsItem) => void
@@ -216,5 +268,8 @@ export interface ClientToServerEvents {
     payload: BoardColumnsReorderPayload,
     ack: (...args: unknown[]) => void,
   ) => void
-  // TODO: add board/column/item command events when moving mutations to websocket.
+  [WS_CLIENT_EVENT_NAMES.BOARD_GROUPS_POSITIONS_SYNC]: (
+    payload: { boardId: number; changes: Array<{ groupId: number; newColumnId: number; newOrderIndex: number }> },
+    ack: (...args: unknown[]) => void,
+  ) => void
 }

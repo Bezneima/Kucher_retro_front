@@ -1,7 +1,9 @@
 import { toRaw } from 'vue'
 import { httpClient } from '@/api/httpClient'
+import { retroBoardService } from '@/api/services/retroBoardService'
 import { getBoardColumns } from '../helpers/selectors'
-import type { TRetroBoardState, TRetroColumnItem } from '../types'
+import { recalculateItemIndices } from '../helpers/positions'
+import type { TRetroBoardState, TRetroColumnItem, TRetroGroup } from '../types'
 
 type TItemActionsContext = TRetroBoardState & {
   ensureLastSyncedPositionsInitialized: () => void
@@ -12,178 +14,263 @@ type TItemActionsContext = TRetroBoardState & {
   clearItemCommentsCache: (itemId: number) => void
 }
 
+const findItemLocation = (columns: ReturnType<typeof getBoardColumns>, itemId: number) => {
+  for (const column of columns) {
+    const rootItem = column.items.find((entry) => entry.id === itemId)
+    if (rootItem) {
+      return {
+        column,
+        group: null as TRetroGroup | null,
+        item: rootItem,
+      }
+    }
+
+    for (const group of column.groups) {
+      const groupItem = group.items.find((entry) => entry.id === itemId)
+      if (!groupItem) {
+        continue
+      }
+
+      return {
+        column,
+        group,
+        item: groupItem,
+      }
+    }
+  }
+
+  return null
+}
+
+const getAllItems = (columns: ReturnType<typeof getBoardColumns>) => {
+  return columns.flatMap((column) => [
+    ...column.items,
+    ...column.groups.flatMap((group) => group.items),
+  ])
+}
+
 export const itemActions = {
   addItemToColumn(this: TItemActionsContext, columnId: number) {
     this.ensureLastSyncedPositionsInitialized()
 
     const columns = getBoardColumns(this)
-    const column = columns.find((item) => item.id === columnId)
-    if (!column) return
+    const column = columns.find((entry) => entry.id === columnId)
+    if (!column) {
+      return
+    }
 
-    const maxItemId = columns
-      .flatMap((item) => item.items)
-      .reduce((maxId, item) => Math.max(maxId, item.id), 0)
-    const columnIndex = columns.findIndex((item) => item.id === columnId)
-    const nextItemId = maxItemId + 1
+    const maxItemId = getAllItems(columns).reduce((maxId, item) => Math.max(maxId, item.id), 0)
+    const columnIndex = columns.findIndex((entry) => entry.id === columnId)
+    const nextItemId = maxItemId + Date.now() + 1
 
-    column.items.unshift({
+    const draftItem: TRetroColumnItem = {
       id: nextItemId,
       description: 'Напишите описание нового элемента',
+      createdAt: '',
       syncedDescription: undefined,
       likes: [],
       commentsCount: 0,
       isDraft: true,
       columnIndex,
       rowIndex: 0,
+      groupId: null,
+      color: undefined,
+    }
+
+    column.entries.unshift({
+      type: 'ITEM',
+      orderIndex: 0,
+      item: draftItem,
     })
-    void this.syncAllItemIndices(false)
+
+    recalculateItemIndices(columns)
     this.setActiveItemId(nextItemId)
   },
-  updateItemDescriptionLocal(this: TItemActionsContext, itemId: number, description: string) {
-    for (const column of getBoardColumns(this)) {
-      const item = column.items.find((i) => i.id === itemId)
-      if (!item) continue
 
-      item.description = description
+  updateItemDescriptionLocal(this: TItemActionsContext, itemId: number, description: string) {
+    const location = findItemLocation(getBoardColumns(this), itemId)
+    if (!location) {
       return
     }
+
+    location.item.description = description
   },
+
   setActiveItemId(this: TItemActionsContext, itemId: number | null) {
     this.activeItemId = itemId
   },
+
   async updateItemDescription(this: TItemActionsContext, itemId: number, description: string) {
-    let itemToUpdate: TRetroColumnItem | null = null
-    let columnIdForItem: number | null = null
-    let persistedDescription: string | null = null
-
-    for (const column of getBoardColumns(this)) {
-      const item = column.items.find((i) => i.id === itemId)
-      if (!item) continue
-
-      persistedDescription = item.syncedDescription ?? item.description
-      item.description = description
-      itemToUpdate = item
-      columnIdForItem = column.id
-      break
+    const columns = getBoardColumns(this)
+    const location = findItemLocation(columns, itemId)
+    if (!location) {
+      return
     }
 
-    if (!itemToUpdate) return
+    const { item, column, group } = location
+    const persistedDescription = item.syncedDescription ?? item.description
+    item.description = description
 
-    if (itemToUpdate.isDraft && columnIdForItem != null) {
-      const oldLocalId = itemToUpdate.id
-      const createResponse = await httpClient.post(`/retro/columns/${columnIdForItem}/items`, {
-        description,
-      })
-      const createdItem = (createResponse.data ?? {}) as Partial<TRetroColumnItem> & {
-        createdAt?: unknown
-        columnIndex?: unknown
-        rowIndex?: unknown
-        commentsCount?: unknown
+    if (item.isDraft) {
+      const oldLocalId = item.id
+      let createdItem: TRetroColumnItem
+      try {
+        createdItem = await retroBoardService.createItem(column.id, {
+          description,
+          groupId: group?.id ?? null,
+        })
+      } catch (error) {
+        item.description = persistedDescription ?? item.description
+        console.error('[retro] failed to create draft item', error)
+        return
       }
 
       if (typeof createdItem.id === 'number' && Number.isFinite(createdItem.id)) {
-        itemToUpdate.id = createdItem.id
+        item.id = createdItem.id
       }
       if (typeof createdItem.description === 'string') {
-        itemToUpdate.description = createdItem.description
+        item.description = createdItem.description
       }
       if (typeof createdItem.createdAt === 'string') {
-        itemToUpdate.createdAt = createdItem.createdAt
+        item.createdAt = createdItem.createdAt
       }
       if (Array.isArray(createdItem.likes)) {
-        itemToUpdate.likes = createdItem.likes.filter((like): like is string => typeof like === 'string')
-      }
-      const createdCommentsCount = Number(createdItem.commentsCount)
-      if (Number.isInteger(createdCommentsCount) && createdCommentsCount >= 0) {
-        itemToUpdate.commentsCount = createdCommentsCount
-      }
-      if ('color' in createdItem) {
-        itemToUpdate.color = typeof createdItem.color === 'string' ? createdItem.color : undefined
-      }
-      if (typeof createdItem.columnIndex === 'number' && Number.isFinite(createdItem.columnIndex)) {
-        itemToUpdate.columnIndex = createdItem.columnIndex
-      }
-      if (typeof createdItem.rowIndex === 'number' && Number.isFinite(createdItem.rowIndex)) {
-        itemToUpdate.rowIndex = createdItem.rowIndex
+        item.likes = createdItem.likes.filter((like): like is string => typeof like === 'string')
       }
 
-      itemToUpdate.isDraft = false
-      itemToUpdate.syncedDescription = itemToUpdate.description
-      if (oldLocalId !== itemToUpdate.id) {
+      const createdCommentsCount = Number(createdItem.commentsCount)
+      if (Number.isInteger(createdCommentsCount) && createdCommentsCount >= 0) {
+        item.commentsCount = createdCommentsCount
+      }
+
+      if ('color' in createdItem) {
+        item.color = typeof createdItem.color === 'string' ? createdItem.color : undefined
+      }
+
+      if (typeof createdItem.columnIndex === 'number' && Number.isFinite(createdItem.columnIndex)) {
+        item.columnIndex = createdItem.columnIndex
+      }
+
+      if (typeof createdItem.rowIndex === 'number' && Number.isFinite(createdItem.rowIndex)) {
+        item.rowIndex = createdItem.rowIndex
+      }
+
+      if ('groupId' in createdItem) {
+        const nextGroupId = Number(createdItem.groupId)
+        item.groupId = Number.isInteger(nextGroupId) && nextGroupId > 0 ? nextGroupId : null
+      }
+
+      item.isDraft = false
+      item.syncedDescription = item.description
+
+      if (oldLocalId !== item.id) {
         delete this.lastSyncedPositions[oldLocalId]
       }
+
       this.setLastSyncedPositions()
       return
     }
 
-    if (persistedDescription === description) return
+    if (persistedDescription === description) {
+      return
+    }
 
-    itemToUpdate.syncedDescription = description
+    item.syncedDescription = description
     void httpClient.patch(`/retro/items/${itemId}/description`, { description })
     console.info(toRaw(this.board))
   },
+
   updateItemLike(this: TItemActionsContext, itemId: number, userId?: string | null) {
     const currentUserId = userId ?? this.getCurrentUserId
-
-    for (const column of getBoardColumns(this)) {
-      const item = column.items.find((i) => i.id === itemId)
-
-      if (!item) continue
-
-      if (currentUserId) {
-        const likes = item.likes
-        const index = likes.indexOf(currentUserId)
-
-        if (index === -1) {
-          likes.push(currentUserId)
-        } else {
-          likes.splice(index, 1)
-        }
-      }
-
-      if (item.isDraft) return
-      void httpClient.patch(`/retro/items/${itemId}/like`)
+    const location = findItemLocation(getBoardColumns(this), itemId)
+    if (!location) {
       return
     }
+
+    const item = location.item
+
+    if (currentUserId) {
+      const likes = item.likes
+      const index = likes.indexOf(currentUserId)
+
+      if (index === -1) {
+        likes.push(currentUserId)
+      } else {
+        likes.splice(index, 1)
+      }
+    }
+
+    if (item.isDraft) {
+      return
+    }
+
+    void httpClient.patch(`/retro/items/${itemId}/like`)
   },
+
   setItemCommentsCount(this: TItemActionsContext, itemId: number, commentsCount: number) {
     const normalizedCommentsCount = Number(commentsCount)
-    if (!Number.isFinite(normalizedCommentsCount)) return
-
-    for (const column of getBoardColumns(this)) {
-      const item = column.items.find((i) => i.id === itemId)
-      if (!item) continue
-
-      item.commentsCount = Math.max(0, Math.floor(normalizedCommentsCount))
+    if (!Number.isFinite(normalizedCommentsCount)) {
       return
     }
+
+    const location = findItemLocation(getBoardColumns(this), itemId)
+    if (!location) {
+      return
+    }
+
+    location.item.commentsCount = Math.max(0, Math.floor(normalizedCommentsCount))
   },
+
   updateItemColor(this: TItemActionsContext, itemId: number, color?: string) {
-    for (const column of getBoardColumns(this)) {
-      const item = column.items.find((i) => i.id === itemId)
-      if (!item) continue
-
-      item.color = color
-      if (item.isDraft) return
-      void httpClient.patch(`/retro/items/${itemId}/color`, { color })
+    const location = findItemLocation(getBoardColumns(this), itemId)
+    if (!location) {
       return
     }
+
+    location.item.color = color
+
+    if (location.item.isDraft) {
+      return
+    }
+
+    void httpClient.patch(`/retro/items/${itemId}/color`, { color })
   },
+
   deleteItem(this: TItemActionsContext, itemId: number) {
     this.ensureLastSyncedPositionsInitialized()
+
+    const columns = getBoardColumns(this)
     let isDraftItem = false
 
-    for (const column of getBoardColumns(this)) {
-      const item = column.items.find((i) => i.id === itemId)
-      if (item?.isDraft) {
-        isDraftItem = true
+    for (const column of columns) {
+      const rootItem = column.items.find((entry) => entry.id === itemId)
+      if (rootItem) {
+        isDraftItem = rootItem.isDraft === true
+        column.entries = column.entries.filter(
+          (entry) => !(entry.type === 'ITEM' && entry.item.id === itemId),
+        )
+        break
       }
-      column.items = column.items.filter((i) => i.id !== itemId)
+
+      for (const group of column.groups) {
+        const itemIndex = group.items.findIndex((entry) => entry.id === itemId)
+        if (itemIndex < 0) {
+          continue
+        }
+
+        const [removed] = group.items.splice(itemIndex, 1)
+        isDraftItem = removed?.isDraft === true
+        break
+      }
     }
-    void this.syncAllItemIndices()
+
+    recalculateItemIndices(columns)
     this.clearItemCommentsCache(itemId)
 
-    if (isDraftItem) return
+    if (isDraftItem) {
+      return
+    }
+
     void httpClient.delete(`/retro/items/${itemId}`)
   },
 }

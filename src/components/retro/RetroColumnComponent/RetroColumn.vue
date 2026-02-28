@@ -45,29 +45,63 @@
       <button class="column-add-button" type="button" @click="onAddItemClick">
         <SvgIcon name="bigplus" class="column-add-button__icon" />
       </button>
+      <button class="column-create-group-button" type="button" @click="onCreateGroupClick">
+        Создать группу
+      </button>
     </div>
+
     <Sortable
       v-if="!isCardFilterActive"
-      :key="sortableKey"
+      :key="rootSortableKey"
+      :list="rootNodes"
+      :item-key="rootNodeKey"
       class="sortable-container"
-      :list="column?.items ?? []"
-      itemKey="id"
-      :options="options"
-      @choose="onColumnChoose"
-      @add="onColumnAdd"
-      @update="onColumnUpdate"
+      :data-column-id="column.id"
+      :data-container-kind="'ROOT'"
+      :options="rootSortableOptions"
+      @add="onRootAdd"
+      @update="onRootUpdate"
     >
       <template #item="{ element }">
-        <RetroColumnItem :element="element" />
+        <div
+          v-if="element.kind === 'ITEM'"
+          class="root-entry-draggable root-entry-item-handle"
+          :data-dnd-kind="'ITEM'"
+          :data-item-id="element.id"
+        >
+          <RetroColumnItem v-if="rootItemById[element.id]" :element="rootItemById[element.id]!" />
+        </div>
+
+        <div
+          v-else
+          class="root-entry-draggable"
+          :data-dnd-kind="'GROUP'"
+          :data-group-id="element.id"
+        >
+          <RetroGroup
+            v-if="groupById[element.id]"
+            :group="groupById[element.id]!"
+            :column-id="column.id"
+            :dnd-enabled="true"
+            :dnd-group-name="mixedDndGroupName"
+          />
+        </div>
       </template>
     </Sortable>
+
     <div v-else class="sortable-container">
-      <RetroColumnItem
-        v-for="element in filteredItems"
-        :key="element.id"
-        :element="element"
-      />
+      <template v-for="entry in filteredEntries" :key="getEntryKey(entry)">
+        <RetroColumnItem v-if="entry.type === 'ITEM'" :element="entry.item" />
+        <RetroGroup
+          v-else
+          :group="entry.group"
+          :column-id="column.id"
+          :dnd-enabled="false"
+          :dnd-group-name="mixedDndGroupName"
+        />
+      </template>
     </div>
+
     <ConfirmDeleteModal
       :is-open="isDeleteColumnModalOpen"
       title="Удалить колонку?"
@@ -93,6 +127,257 @@
     />
   </div>
 </template>
+
+<script setup lang="ts">
+import { Sortable } from 'sortablejs-vue3'
+import { computed, ref, toRef, watch } from 'vue'
+import type { TRetroColumn, TRetroColumnColor, TRetroColumnEntry } from '@/stores/RetroStore'
+import { useRetroStore } from '@/stores/RetroStore'
+import { useBoardNotifications } from '@/composables/useBoardNotifications'
+import SvgIcon from '@/components/common/SvgIcon/SvgIcon.vue'
+import ConfirmDeleteModal from '@/components/common/ConfirmDeleteModal/ConfirmDeleteModal.vue'
+import TextEditModal from '@/components/common/TextEditModal/TextEditModal.vue'
+import RetroColumnItem from '../RetroColumItem/RetroColumnItem.vue'
+import RetroColumnMenu from './RetroColumnMenu.vue'
+import RetroGroup from '../RetroGroupComponent/RetroGroup.vue'
+
+type TRootNode = {
+  kind: 'ITEM' | 'GROUP'
+  id: number
+}
+
+const retroStore = useRetroStore()
+const { pushNotification } = useBoardNotifications()
+
+const props = defineProps<{
+  column: TRetroColumn
+}>()
+
+const mixedDndGroupName = 'retro-mixed-items'
+
+const column = toRef(props, 'column')
+const menuButtonRef = ref<HTMLElement | null>(null)
+const isMenuOpen = ref(false)
+const isDeleteColumnModalOpen = ref(false)
+const isEditColumnModalOpen = ref(false)
+const isEditDescriptionModalOpen = ref(false)
+const nameDraft = ref('')
+const descriptionDraft = ref('')
+const rootNodes = ref<TRootNode[]>([])
+
+const rootNodeKey = (node: TRootNode) => `${node.kind}:${node.id}`
+const rootSortableKey = computed(() => rootNodes.value.map((node) => rootNodeKey(node)).join('|'))
+
+const isCardFilterActive = computed(() => retroStore.getHasCardSearchQuery)
+const filteredEntries = computed(() => retroStore.getFilteredColumnEntries(column.value.id))
+
+const rootItemById = computed(() => {
+  const items = column.value.entries
+    .filter((entry) => entry.type === 'ITEM')
+    .map((entry) => [entry.item.id, entry.item] as const)
+  return Object.fromEntries(items) as Record<number, TRetroColumn['items'][number]>
+})
+
+const groupById = computed(() => {
+  const groups = column.value.entries
+    .filter((entry) => entry.type === 'GROUP')
+    .map((entry) => [entry.group.id, entry.group] as const)
+  return Object.fromEntries(groups) as Record<number, TRetroColumn['groups'][number]>
+})
+
+watch(
+  () => column.value.entries.map((entry) => `${entry.type}:${entry.type === 'ITEM' ? entry.item.id : entry.group.id}`).join(','),
+  () => {
+    rootNodes.value = column.value.entries.map((entry) => ({
+      kind: entry.type,
+      id: entry.type === 'ITEM' ? entry.item.id : entry.group.id,
+    }))
+  },
+  { immediate: true },
+)
+
+const defaultColumnColor: TRetroColumnColor = {
+  columnColor: '#f0f0f0',
+  itemColor: '#f0f0f0',
+  buttonColor: '#f0f0f0',
+}
+
+const rootSortableOptions = computed(() => ({
+  group: {
+    name: mixedDndGroupName,
+    pull: true,
+    put: true,
+  },
+  draggable: '.root-entry-draggable',
+  handle: '.root-entry-item-handle, .group-drag-handle',
+  animation: 150,
+  swapThreshold: 0.65,
+  emptyInsertThreshold: 20,
+  disabled: isCardFilterActive.value,
+}))
+
+const getEntryKey = (entry: TRetroColumnEntry) => {
+  if (entry.type === 'ITEM') {
+    return `item:${entry.item.id}`
+  }
+
+  return `group:${entry.group.id}`
+}
+
+const onMenuButtonClick = (event: MouseEvent) => {
+  event.preventDefault()
+  event.stopPropagation()
+  isMenuOpen.value = !isMenuOpen.value
+}
+
+const closeMenu = () => {
+  isMenuOpen.value = false
+}
+
+const onEditColumnClick = () => {
+  closeMenu()
+  nameDraft.value = column.value.name
+  isEditColumnModalOpen.value = true
+}
+
+const onCloseEditColumnModal = () => {
+  isEditColumnModalOpen.value = false
+}
+
+const onConfirmEditColumn = (value: string) => {
+  retroStore.updateColumnName(column.value.id, value)
+  retroStore.updateColumnNameEnd(column.value.id)
+  isEditColumnModalOpen.value = false
+}
+
+const onEditDescriptionClick = () => {
+  closeMenu()
+  descriptionDraft.value = column.value.description ?? ''
+  isEditDescriptionModalOpen.value = true
+}
+
+const onCloseEditDescriptionModal = () => {
+  isEditDescriptionModalOpen.value = false
+}
+
+const onConfirmEditDescription = (value: string) => {
+  retroStore.updateColumnDescription(column.value.id, value)
+  isEditDescriptionModalOpen.value = false
+}
+
+const onCopyNameClick = async () => {
+  closeMenu()
+  const textToCopy = column.value.name.trim()
+  if (!textToCopy) return
+
+  try {
+    await navigator.clipboard.writeText(textToCopy)
+  } catch (error) {
+    console.error('Failed to copy column name', error)
+  }
+}
+
+const onSetColumnColor = (color: TRetroColumnColor) => {
+  retroStore.updateColumnColor(column.value.id, color)
+}
+
+const onRemoveColumnColor = () => {
+  retroStore.updateColumnColor(column.value.id, defaultColumnColor)
+}
+
+const onDeleteColumn = () => {
+  closeMenu()
+  isDeleteColumnModalOpen.value = true
+}
+
+const onCloseDeleteColumnModal = () => {
+  isDeleteColumnModalOpen.value = false
+}
+
+const onConfirmDeleteColumn = () => {
+  isDeleteColumnModalOpen.value = false
+  retroStore.deleteColumn(column.value.id)
+}
+
+const onMoveRootEntry = async (event: { item: HTMLElement; newIndex?: number }) => {
+  const evt = event as any
+  const kind = event.item?.dataset?.dndKind
+  const newIndex = typeof event.newIndex === 'number' ? event.newIndex : 0
+
+  if (newIndex < 0) {
+    return
+  }
+
+  const oldIndex = typeof evt.oldIndex === 'number' ? evt.oldIndex : -1
+  const fromColumnId = Number(evt.from?.dataset?.columnId)
+  const toColumnId = Number(evt.to?.dataset?.columnId)
+  if (oldIndex === newIndex && fromColumnId === toColumnId) {
+    return
+  }
+
+  try {
+    if (kind === 'ITEM') {
+      const movedItemId = Number(event.item?.dataset?.itemId)
+      if (!Number.isInteger(movedItemId) || movedItemId <= 0) {
+        return
+      }
+
+      await retroStore.moveItemWithSync({
+        itemId: movedItemId,
+        newColumnId: column.value.id,
+        newGroupId: null,
+        newRowIndex: newIndex,
+      })
+      retroStore.setActiveItemId(null)
+      return
+    }
+
+    if (kind === 'GROUP') {
+      const movedGroupId = Number(event.item?.dataset?.groupId)
+      if (!Number.isInteger(movedGroupId) || movedGroupId <= 0) {
+        return
+      }
+
+      await retroStore.moveGroupWithSync({
+        groupId: movedGroupId,
+        newColumnId: column.value.id,
+        newOrderIndex: newIndex,
+      })
+      return
+    }
+  } catch (error) {
+    const message =
+      error instanceof Error && typeof error.message === 'string' && error.message
+        ? error.message
+        : 'Не удалось выполнить DnD операцию'
+    pushNotification('error', 'DnD ошибка', message)
+  }
+}
+
+const onRootAdd = (event: any) => {
+  void onMoveRootEntry(event)
+}
+
+const onRootUpdate = (event: any) => {
+  void onMoveRootEntry(event)
+}
+
+const onAddItemClick = () => {
+  retroStore.addItemToColumn(column.value.id)
+}
+
+const onCreateGroupClick = async () => {
+  try {
+    await retroStore.createGroup(column.value.id)
+  } catch (error) {
+    const message =
+      error instanceof Error && typeof error.message === 'string' && error.message
+        ? error.message
+        : 'Не удалось создать группу'
+    pushNotification('error', 'Ошибка группы', message)
+  }
+}
+</script>
 
 <style>
 .column {
@@ -179,11 +464,12 @@
   display: block;
 }
 
-.column-add-button {
-  margin-top: 16px;
+.column-add-button,
+.column-create-group-button {
+  margin-top: 12px;
   width: 100%;
-  height: 47px;
-  border: 3px dashed var(--button-bg);
+  height: 42px;
+  border: 2px dashed var(--button-bg);
   border-radius: 10px;
   background-color: transparent;
   color: var(--button-bg);
@@ -191,10 +477,13 @@
   display: flex;
   align-items: center;
   justify-content: center;
+  font-size: 13px;
+  gap: 6px;
 }
 
-.column-add-button:hover {
-  border: 3px dashed color-mix(in srgb, var(--button-bg) 80%, black);
+.column-add-button:hover,
+.column-create-group-button:hover {
+  border-color: color-mix(in srgb, var(--button-bg) 80%, black);
   color: color-mix(in srgb, var(--button-bg) 80%, black);
 }
 
@@ -220,150 +509,7 @@
   overflow-y: auto;
 }
 
-.item {
-  background-color: #f0f0f0;
+.root-entry-item-handle {
+  margin-top: 16px;
 }
 </style>
-
-<script setup lang="ts">
-import { ref, computed, toRef } from 'vue'
-import { Sortable } from 'sortablejs-vue3'
-import { type TRetroColumn, type TRetroColumnColor } from '@/stores/RetroStore'
-import SvgIcon from '@/components/common/SvgIcon/SvgIcon.vue'
-import ConfirmDeleteModal from '@/components/common/ConfirmDeleteModal/ConfirmDeleteModal.vue'
-import TextEditModal from '@/components/common/TextEditModal/TextEditModal.vue'
-import RetroColumnItem from '../RetroColumItem/RetroColumnItem.vue'
-import RetroColumnMenu from './RetroColumnMenu.vue'
-import { useRetroStore } from '@/stores/RetroStore'
-const retroStore = useRetroStore()
-
-const props = defineProps<{
-  column: TRetroColumn
-}>()
-
-const column = toRef(props, 'column')
-const menuButtonRef = ref<HTMLElement | null>(null)
-const isMenuOpen = ref(false)
-const isDeleteColumnModalOpen = ref(false)
-const isEditColumnModalOpen = ref(false)
-const isEditDescriptionModalOpen = ref(false)
-const nameDraft = ref('')
-const descriptionDraft = ref('')
-const sortableKey = computed(
-  () => `${column.value.id}:${column.value.items.map((item) => item.id).join(',')}`,
-)
-const isCardFilterActive = computed(() => retroStore.getHasCardSearchQuery)
-const filteredItems = computed(() => retroStore.getFilteredColumnItems(column.value.id))
-const defaultColumnColor: TRetroColumnColor = {
-  columnColor: '#f0f0f0',
-  itemColor: '#f0f0f0',
-  buttonColor: '#f0f0f0',
-}
-
-const options = {
-  group: 'shared',
-  draggable: '.card-container:not(.card-container-is-editing)',
-  animation: 150,
-  swapThreshold: 0.65,
-  emptyInsertThreshold: 20,
-}
-
-const onMenuButtonClick = (event: MouseEvent) => {
-  event.preventDefault()
-  event.stopPropagation()
-  isMenuOpen.value = !isMenuOpen.value
-}
-
-const closeMenu = () => {
-  isMenuOpen.value = false
-}
-
-const onEditColumnClick = () => {
-  closeMenu()
-  nameDraft.value = column.value.name
-  isEditColumnModalOpen.value = true
-}
-
-const onCloseEditColumnModal = () => {
-  isEditColumnModalOpen.value = false
-}
-
-const onConfirmEditColumn = (value: string) => {
-  retroStore.updateColumnName(column.value.id, value)
-  retroStore.updateColumnNameEnd(column.value.id)
-  isEditColumnModalOpen.value = false
-}
-
-const onEditDescriptionClick = () => {
-  closeMenu()
-  descriptionDraft.value = column.value.description ?? ''
-  isEditDescriptionModalOpen.value = true
-}
-
-const onCloseEditDescriptionModal = () => {
-  isEditDescriptionModalOpen.value = false
-}
-
-const onConfirmEditDescription = (value: string) => {
-  retroStore.updateColumnDescription(column.value.id, value)
-  isEditDescriptionModalOpen.value = false
-}
-
-const onCopyNameClick = async () => {
-  closeMenu()
-  const textToCopy = column.value.name.trim()
-  if (!textToCopy) return
-
-  try {
-    await navigator.clipboard.writeText(textToCopy)
-  } catch (error) {
-    console.error('Failed to copy column name', error)
-  }
-}
-
-const onSetColumnColor = (color: TRetroColumnColor) => {
-  retroStore.updateColumnColor(column.value.id, color)
-}
-
-const onRemoveColumnColor = () => {
-  retroStore.updateColumnColor(column.value.id, defaultColumnColor)
-}
-
-const onDeleteColumn = () => {
-  closeMenu()
-  isDeleteColumnModalOpen.value = true
-}
-
-const onCloseDeleteColumnModal = () => {
-  isDeleteColumnModalOpen.value = false
-}
-
-const onConfirmDeleteColumn = () => {
-  isDeleteColumnModalOpen.value = false
-  retroStore.deleteColumn(column.value.id)
-}
-
-const onColumnChoose = (event: any) => {
-  // console.log('choose', event.item.id)
-}
-
-const onColumnAdd = (event: any) => {
-  const movedItemId = Number((event.item as HTMLElement | null)?.id)
-  if (!Number.isFinite(movedItemId) || movedItemId <= 0) return
-
-  retroStore.moveItemByIdToColumn(movedItemId, column.value.id, event.newIndex)
-  retroStore.setActiveItemId(null)
-}
-
-const onColumnUpdate = (event: any) => {
-  const movedItemId = Number((event.item as HTMLElement | null)?.id)
-  if (!Number.isFinite(movedItemId) || movedItemId <= 0) return
-
-  retroStore.moveItemByIdToColumn(movedItemId, column.value.id, event.newIndex)
-  retroStore.setActiveItemId(null)
-}
-
-const onAddItemClick = () => {
-  retroStore.addItemToColumn(column.value.id)
-}
-</script>

@@ -1,4 +1,5 @@
 import { httpClient } from '@/api/httpClient'
+import { retroBoardService } from '@/api/services/retroBoardService'
 import { renameBoard } from '@/shared/socket'
 import { normalizeColumns } from '../helpers/normalize'
 import { reorderColumnsByPayloadIds } from '../helpers/reorderColumns'
@@ -189,8 +190,8 @@ export const boardActions = {
     if (Array.isArray(boardWithColumns.columns)) {
       board.columns = this.normalizeColumns(boardWithColumns.columns)
     } else {
-      const columnsResponse = await httpClient.get(`/retro/boards/${boardId}/columns`)
-      board.columns = this.normalizeColumns(columnsResponse.data)
+      const columnsPayload = await retroBoardService.getBoardColumns(boardId)
+      board.columns = this.normalizeColumns(columnsPayload)
     }
 
     this.board = [board]
@@ -218,7 +219,7 @@ export const boardActions = {
     try {
       const [boardsResponse, columnsResponse] = await Promise.all([
         httpClient.get('/retro/boards'),
-        httpClient.get(`/retro/boards/${boardId}/columns`),
+        retroBoardService.getBoardColumns(boardId),
       ])
 
       const boardsData = Array.isArray(boardsResponse.data) ? boardsResponse.data : []
@@ -234,7 +235,7 @@ export const boardActions = {
         date: typeof rawBoard?.date === 'string' ? rawBoard.date : '',
         description: typeof rawBoard?.description === 'string' ? rawBoard.description : '',
         isAllCardsHidden: extractIsAllCardsHiddenFromBoardPayload(rawBoard),
-        columns: this.normalizeColumns(columnsResponse.data),
+        columns: this.normalizeColumns(columnsResponse),
       }
 
       this.board = [board]
@@ -263,8 +264,8 @@ export const boardActions = {
     }
 
     try {
-      const columnsResponse = await httpClient.get(`/retro/boards/${boardId}/columns`)
-      currentBoard.columns = this.normalizeColumns(columnsResponse.data)
+      const columnsPayload = await retroBoardService.getBoardColumns(boardId)
+      currentBoard.columns = this.normalizeColumns(columnsPayload)
       this.board = [{ ...currentBoard }]
       this.setLastSyncedPositions()
     } catch (error) {

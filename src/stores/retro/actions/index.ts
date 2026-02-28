@@ -4,12 +4,14 @@ import { columnActions } from './column.actions'
 import { positionActions } from './position.actions'
 import { currentUserActions } from './currentUser.actions'
 import { realtimeActions } from './realtime.actions'
+import { groupActions } from './group.actions'
 
 export const retroActions = {
   ...boardActions,
   ...itemActions,
   ...columnActions,
   ...positionActions,
+  ...groupActions,
   ...currentUserActions,
   ...realtimeActions,
 }

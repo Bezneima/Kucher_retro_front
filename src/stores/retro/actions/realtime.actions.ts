@@ -9,13 +9,14 @@ import {
   type WsColumn,
   type WsComment,
   type WsDeletedPayload,
+  type WsGroup,
   type WsItem,
   type WsItemCommentDeletedPayload,
   type WsItemCommentsFetchedPayload,
 } from '@/shared/ws.types'
 import { availableColors, goodCardColors } from '../constants'
 import { normalizeColumns } from '../helpers/normalize'
-import { recalculateItemIndices } from '../helpers/positions'
+import { applySyncColumnsToBoard, recalculateItemIndices } from '../helpers/positions'
 import { reorderColumnsByPayloadIds } from '../helpers/reorderColumns'
 import type {
   TRetroBoard,
@@ -125,6 +126,29 @@ const isCurrentBoardEvent = (state: TRealtimeActionsContext, boardId: number | n
   return state.board[0]?.id === boardId
 }
 
+const resolveGroupEventBoardId = (
+  state: TRealtimeActionsContext,
+  payload: WsGroup & { boardId?: number },
+): number | null => {
+  const payloadBoardId = asPositiveNumber(payload.boardId)
+  if (payloadBoardId) {
+    return payloadBoardId
+  }
+
+  const payloadColumnId = asPositiveNumber(payload.columnId)
+  if (!payloadColumnId) {
+    return null
+  }
+
+  const currentBoard = state.board[0]
+  if (!currentBoard) {
+    return null
+  }
+
+  const hasColumn = currentBoard.columns.some((column) => column.id === payloadColumnId)
+  return hasColumn ? currentBoard.id : null
+}
+
 const findColumnById = (columns: TRetroColumn[], columnId: number) => {
   return columns.find((column) => column.id === columnId) ?? null
 }
@@ -142,17 +166,40 @@ const findItemLocationById = (columns: TRetroColumn[], itemId: number) => {
     const column = columns[columnIndex]
     if (!column) continue
 
-    const itemIndex = column.items.findIndex((item) => item.id === itemId)
-    if (itemIndex < 0) continue
+    const rootItemIndex = column.items.findIndex((item) => item.id === itemId)
+    if (rootItemIndex >= 0) {
+      const item = column.items[rootItemIndex]
+      if (!item) {
+        continue
+      }
 
-    const item = column.items[itemIndex]
-    if (!item) continue
+      return {
+        column,
+        columnIndex,
+        group: null,
+        item,
+        itemIndex: rootItemIndex,
+      }
+    }
 
-    return {
-      column,
-      columnIndex,
-      item,
-      itemIndex,
+    for (const group of column.groups) {
+      const groupItemIndex = group.items.findIndex((item) => item.id === itemId)
+      if (groupItemIndex < 0) {
+        continue
+      }
+
+      const item = group.items[groupItemIndex]
+      if (!item) {
+        continue
+      }
+
+      return {
+        column,
+        columnIndex,
+        group,
+        item,
+        itemIndex: groupItemIndex,
+      }
     }
   }
 
@@ -233,6 +280,8 @@ const normalizeNewColumn = (payload: WsColumn, fallbackIndex: number): TRetroCol
   normalized.color = normalizeColumnColorPayload(payload.color, buildFallbackColumnColor(fallbackIndex))
   normalized.isDraft = false
   normalized.items = []
+  normalized.groups = []
+  normalized.entries = []
 
   return normalized
 }
@@ -325,6 +374,10 @@ const mergeItemPayload = (targetItem: TRetroColumnItem, payload: WsItem) => {
   if (rowIndex != null) {
     targetItem.rowIndex = rowIndex
   }
+
+  if ('groupId' in payload) {
+    targetItem.groupId = asPositiveNumber(payload.groupId) ?? null
+  }
 }
 
 const normalizeSyncItem = (
@@ -344,7 +397,7 @@ const normalizeSyncItem = (
   return {
     id: itemId,
     description: asString(payload.description) ?? '',
-    createdAt: asTrimmedString(payload.createdAt) ?? undefined,
+    createdAt: asTrimmedString(payload.createdAt) ?? '',
     syncedDescription: asString(payload.description) ?? '',
     likes: asStringArray(payload.likes),
     commentsCount,
@@ -352,6 +405,7 @@ const normalizeSyncItem = (
     isDraft: false,
     columnIndex,
     rowIndex,
+    groupId: asPositiveNumber(payload.groupId) ?? null,
   }
 }
 
@@ -380,6 +434,12 @@ const normalizeSyncColumn = (
     isNameEditing:
       typeof payload.isNameEditing === 'boolean' ? payload.isNameEditing : existingColumn.isNameEditing,
     items,
+    groups: existingColumn.groups,
+    entries: items.map((item, index) => ({
+      type: 'ITEM' as const,
+      orderIndex: index,
+      item,
+    })),
   }
 }
 
@@ -393,12 +453,175 @@ const toPositiveNumberArray = (value: unknown): number[] => {
     .filter((entry): entry is number => entry !== null)
 }
 
+type TColumnPositionProjection = {
+  rootOrder: string[]
+  groupItemsOrder: Array<{ groupId: number; itemIds: number[] }>
+}
+
+const getTargetChangedColumnIds = (
+  payload: SyncPositionsPayload,
+  normalizedColumns: TRetroColumn[],
+): number[] => {
+  const changedColumnIds = Array.from(new Set(toPositiveNumberArray(payload.changedColumnIds)))
+  if (changedColumnIds.length > 0) {
+    return changedColumnIds
+  }
+
+  return Array.from(new Set(normalizedColumns.map((column) => column.id).filter((id) => id > 0)))
+}
+
+const buildColumnPositionProjection = (column: TRetroColumn): TColumnPositionProjection => {
+  const rootOrder = column.entries.map((entry) => {
+    if (entry.type === 'ITEM') {
+      return `I:${entry.item.id}`
+    }
+
+    return `G:${entry.group.id}`
+  })
+
+  const groupItemsOrder = column.groups
+    .map((group) => ({
+      groupId: group.id,
+      itemIds: group.items.map((item) => item.id),
+    }))
+    .sort((left, right) => left.groupId - right.groupId)
+
+  return {
+    rootOrder,
+    groupItemsOrder,
+  }
+}
+
 const isSameNumberArray = (left: number[], right: number[]) => {
   if (left.length !== right.length) {
     return false
   }
 
   return left.every((value, index) => value === right[index])
+}
+
+const isSameColumnPositionProjection = (
+  left: TColumnPositionProjection,
+  right: TColumnPositionProjection,
+) => {
+  if (left.rootOrder.length !== right.rootOrder.length) {
+    return false
+  }
+
+  for (let index = 0; index < left.rootOrder.length; index += 1) {
+    if (left.rootOrder[index] !== right.rootOrder[index]) {
+      return false
+    }
+  }
+
+  if (left.groupItemsOrder.length !== right.groupItemsOrder.length) {
+    return false
+  }
+
+  for (let index = 0; index < left.groupItemsOrder.length; index += 1) {
+    const leftGroup = left.groupItemsOrder[index]
+    const rightGroup = right.groupItemsOrder[index]
+
+    if (!leftGroup || !rightGroup) {
+      return false
+    }
+
+    if (leftGroup.groupId !== rightGroup.groupId) {
+      return false
+    }
+
+    if (!isSameNumberArray(leftGroup.itemIds, rightGroup.itemIds)) {
+      return false
+    }
+  }
+
+  return true
+}
+
+const applyRealtimePositionsSyncedWithNoopGuard = (
+  state: TRealtimeActionsContext,
+  payload: SyncPositionsPayload,
+) => {
+  const boardId = asPositiveNumber(payload.boardId)
+  if (!isCurrentBoardEvent(state, boardId)) {
+    return
+  }
+  if (!boardId) {
+    return
+  }
+
+  const columnsPayload = Array.isArray(payload.columns) ? payload.columns : []
+  if (payload.updated === 0 && columnsPayload.length === 0) {
+    return
+  }
+
+  const board = getCurrentBoard(state)
+  if (!board) {
+    return
+  }
+
+  const normalizedColumns = normalizeColumns(columnsPayload)
+  const targetIds = getTargetChangedColumnIds(payload, normalizedColumns)
+  if (targetIds.length === 0) {
+    return
+  }
+
+  const localById = new Map(board.columns.map((column) => [column.id, column] as const))
+  const incomingById = new Map<number, TRetroColumn>()
+  const duplicateIncomingIds = new Set<number>()
+
+  for (const column of normalizedColumns) {
+    if (incomingById.has(column.id)) {
+      duplicateIncomingIds.add(column.id)
+      continue
+    }
+
+    incomingById.set(column.id, column)
+  }
+
+  const hasTargetDuplicate = targetIds.some((columnId) => duplicateIncomingIds.has(columnId))
+  if (hasTargetDuplicate) {
+    void state.loadBoardColumns(boardId)
+    return
+  }
+
+  for (const columnId of targetIds) {
+    if (!localById.has(columnId) || !incomingById.has(columnId)) {
+      void state.loadBoardColumns(boardId)
+      return
+    }
+  }
+
+  let hasDiff = false
+  for (const columnId of targetIds) {
+    const localColumn = localById.get(columnId)
+    const incomingColumn = incomingById.get(columnId)
+    if (!localColumn || !incomingColumn) {
+      void state.loadBoardColumns(boardId)
+      return
+    }
+
+    const localProjection = buildColumnPositionProjection(localColumn)
+    const incomingProjection = buildColumnPositionProjection(incomingColumn)
+    if (!isSameColumnPositionProjection(localProjection, incomingProjection)) {
+      hasDiff = true
+      break
+    }
+  }
+
+  if (!hasDiff) {
+    return
+  }
+
+  board.columns = applySyncColumnsToBoard(board.columns, {
+    boardId,
+    updated: payload.updated,
+    changedColumnIds: targetIds,
+    columns: normalizedColumns,
+  })
+
+  patchBoardReference(state)
+  state.setLastSyncedPositions()
 }
 
 const normalizeNewItem = (payload: WsItem, fallbackColumnIndex: number): TRetroColumnItem | null => {
@@ -413,7 +636,7 @@ const normalizeNewItem = (payload: WsItem, fallbackColumnIndex: number): TRetroC
   return {
     id: itemId,
     description: asString(payload.description) ?? '',
-    createdAt: asTrimmedString(payload.createdAt) ?? undefined,
+    createdAt: asTrimmedString(payload.createdAt) ?? '',
     syncedDescription: asString(payload.description) ?? '',
     likes: asStringArray(payload.likes),
     commentsCount:
@@ -424,6 +647,7 @@ const normalizeNewItem = (payload: WsItem, fallbackColumnIndex: number): TRetroC
     isDraft: false,
     columnIndex,
     rowIndex,
+    groupId: asPositiveNumber(payload.groupId) ?? null,
   }
 }
 
@@ -443,10 +667,20 @@ const bumpItemCommentsCount = (state: TRealtimeActionsContext, itemId: number, d
 
   for (const column of state.board[0]?.columns ?? []) {
     const item = column.items.find((entry) => entry.id === itemId)
-    if (!item) continue
+    if (item) {
+      item.commentsCount = Math.max(0, item.commentsCount + delta)
+      return
+    }
 
-    item.commentsCount = Math.max(0, item.commentsCount + delta)
-    return
+    for (const group of column.groups) {
+      const groupItem = group.items.find((entry) => entry.id === itemId)
+      if (!groupItem) {
+        continue
+      }
+
+      groupItem.commentsCount = Math.max(0, groupItem.commentsCount + delta)
+      return
+    }
   }
 }
 
@@ -636,87 +870,7 @@ export const realtimeActions = {
     }
   },
   applyRealtimeBoardItemsPositionsSynced(this: TRealtimeActionsContext, payload: SyncPositionsPayload) {
-    const boardId = asPositiveNumber(payload.boardId)
-    if (!isCurrentBoardEvent(this, boardId)) {
-      return
-    }
-    if (!boardId) {
-      return
-    }
-
-    const columnsPayload = Array.isArray(payload.columns) ? payload.columns : []
-    if (payload.updated === 0 && columnsPayload.length === 0) {
-      return
-    }
-
-    const board = getCurrentBoard(this)
-    if (!board) {
-      return
-    }
-
-    const changedColumnIds = toPositiveNumberArray(payload.changedColumnIds)
-    const payloadColumnIds = toPositiveNumberArray(columnsPayload.map((column) => column.id))
-    const changedColumnIdsSet = new Set(changedColumnIds)
-
-    if (import.meta.env.DEV && !isSameNumberArray(payloadColumnIds, changedColumnIds)) {
-      console.warn('[retro] synced positions payload mismatch', {
-        boardId,
-        changedColumnIds,
-        payloadColumnIds,
-      })
-    }
-
-    let shouldFallbackRefetch = false
-    let appliedColumnsCount = 0
-
-    for (const payloadColumn of columnsPayload) {
-      const payloadColumnId = asPositiveNumber(payloadColumn.id)
-      if (!payloadColumnId) {
-        continue
-      }
-
-      if (changedColumnIdsSet.size > 0 && !changedColumnIdsSet.has(payloadColumnId)) {
-        continue
-      }
-
-      const localColumnIndex = board.columns.findIndex((column) => column.id === payloadColumnId)
-      if (localColumnIndex < 0) {
-        shouldFallbackRefetch = true
-        break
-      }
-
-      const localColumn = board.columns[localColumnIndex]
-      if (!localColumn) {
-        shouldFallbackRefetch = true
-        break
-      }
-
-      const normalizedColumn = normalizeSyncColumn(payloadColumn, localColumn, localColumnIndex)
-      if (!normalizedColumn) {
-        shouldFallbackRefetch = true
-        break
-      }
-
-      board.columns[localColumnIndex] = normalizedColumn
-      appliedColumnsCount += 1
-    }
-
-    if (
-      changedColumnIdsSet.size > 0 &&
-      columnsPayload.length > 0 &&
-      appliedColumnsCount < changedColumnIdsSet.size
-    ) {
-      shouldFallbackRefetch = true
-    }
-
-    if (shouldFallbackRefetch) {
-      void this.loadBoardColumns(boardId)
-      return
-    }
-
-    recalculateItemIndices(board.columns)
-    patchBoardReference(this)
-    this.setLastSyncedPositions()
+    applyRealtimePositionsSyncedWithNoopGuard(this, payload)
   },
   applyRealtimeColumnCreated(this: TRealtimeActionsContext, payload: WsColumn & { boardId: number }) {
     const boardId = asPositiveNumber(payload.boardId)
@@ -858,6 +1012,59 @@ export const realtimeActions = {
 
     void this.loadBoardColumns(boardId)
   },
+  applyRealtimeBoardGroupsPositionsSynced(this: TRealtimeActionsContext, payload: SyncPositionsPayload) {
+    applyRealtimePositionsSyncedWithNoopGuard(this, payload)
+  },
+  applyRealtimeGroupCreated(this: TRealtimeActionsContext, payload: WsGroup & { boardId?: number }) {
+    const boardId = resolveGroupEventBoardId(this, payload)
+    if (!isCurrentBoardEvent(this, boardId) || !boardId) {
+      return
+    }
+
+    void this.loadBoardColumns(boardId)
+  },
+  applyRealtimeGroupNameUpdated(this: TRealtimeActionsContext, payload: WsGroup & { boardId?: number }) {
+    const boardId = resolveGroupEventBoardId(this, payload)
+    if (!isCurrentBoardEvent(this, boardId) || !boardId) {
+      return
+    }
+
+    void this.loadBoardColumns(boardId)
+  },
+  applyRealtimeGroupColorUpdated(this: TRealtimeActionsContext, payload: WsGroup & { boardId?: number }) {
+    const boardId = resolveGroupEventBoardId(this, payload)
+    if (!isCurrentBoardEvent(this, boardId) || !boardId) {
+      return
+    }
+
+    void this.loadBoardColumns(boardId)
+  },
+  applyRealtimeGroupDescriptionUpdated(
+    this: TRealtimeActionsContext,
+    payload: WsGroup & { boardId?: number },
+  ) {
+    const boardId = resolveGroupEventBoardId(this, payload)
+    if (!isCurrentBoardEvent(this, boardId) || !boardId) {
+      return
+    }
+
+    void this.loadBoardColumns(boardId)
+  },
+  applyRealtimeGroupDeleted(
+    this: TRealtimeActionsContext,
+    payload: WsDeletedPayload & WsGroup & { boardId?: number },
+  ) {
+    if (payload.deleted !== true) {
+      return
+    }
+
+    const boardId = resolveGroupEventBoardId(this, payload)
+    if (!isCurrentBoardEvent(this, boardId) || !boardId) {
+      return
+    }
+
+    void this.loadBoardColumns(boardId)
+  },
   applyRealtimeItemCreated(this: TRealtimeActionsContext, payload: WsItem) {
     const board = getCurrentBoard(this)
     const boardId = asPositiveNumber(payload.boardId)
@@ -887,22 +1094,33 @@ export const realtimeActions = {
     }
 
     const incomingDescription = newItem.description.trim()
+    const targetGroupId = asPositiveNumber(payload.groupId)
+    const targetGroup =
+      targetGroupId != null ? targetColumn.groups.find((group) => group.id === targetGroupId) : null
+
+    if (targetGroupId != null && !targetGroup) {
+      void this.loadBoardColumns(boardId)
+      return
+    }
+
     if (incomingDescription) {
-      const draftIndex = targetColumn.items.findIndex(
+      const draftCollection = targetGroup ? targetGroup.items : targetColumn.items
+      const draftIndex = draftCollection.findIndex(
         (entry) => entry.isDraft && entry.description.trim() === incomingDescription,
       )
       if (draftIndex >= 0) {
-        const draftItem = targetColumn.items[draftIndex]
+        const draftItem = draftCollection[draftIndex]
         if (!draftItem) {
           return
         }
 
-        targetColumn.items[draftIndex] = {
+        draftCollection[draftIndex] = {
           ...draftItem,
           ...newItem,
           id: newItem.id,
           isDraft: false,
           syncedDescription: newItem.description,
+          groupId: targetGroup?.id ?? null,
         }
         recalculateItemIndices(board.columns)
         patchBoardReference(this)
@@ -912,8 +1130,19 @@ export const realtimeActions = {
     }
 
     const payloadRowIndex = asNonNegativeNumber(payload.rowIndex)
-    const insertIndex = payloadRowIndex == null ? 0 : Math.min(payloadRowIndex, targetColumn.items.length)
-    targetColumn.items.splice(insertIndex, 0, newItem)
+    if (targetGroup) {
+      const insertIndex = payloadRowIndex == null ? 0 : Math.min(payloadRowIndex, targetGroup.items.length)
+      newItem.groupId = targetGroup.id
+      targetGroup.items.splice(insertIndex, 0, newItem)
+    } else {
+      const insertIndex = payloadRowIndex == null ? 0 : Math.min(payloadRowIndex, targetColumn.entries.length)
+      newItem.groupId = null
+      targetColumn.entries.splice(insertIndex, 0, {
+        type: 'ITEM',
+        orderIndex: insertIndex,
+        item: newItem,
+      })
+    }
 
     recalculateItemIndices(board.columns)
     patchBoardReference(this)
