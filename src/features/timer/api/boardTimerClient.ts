@@ -6,6 +6,7 @@ export type BoardTimerStatus = 'RUNNING' | 'PAUSED'
 export type BoardTimerDto = {
   status: BoardTimerStatus
   remainingSeconds: number
+  durationSeconds: number
 }
 
 export type StartBoardTimerRequest = {
@@ -43,6 +44,7 @@ const normalizeBoardTimer = (payload: unknown): BoardTimerDto | null => {
 
   const status = asBoardTimerStatus(payload.status)
   let remainingSeconds = asNonNegativeInteger(payload.remainingSeconds)
+  const durationSeconds = asNonNegativeInteger(payload.durationSeconds)
   if (!status || remainingSeconds === null) {
     return null
   }
@@ -58,6 +60,7 @@ const normalizeBoardTimer = (payload: unknown): BoardTimerDto | null => {
   return {
     status: status === 'RUNNING' && remainingSeconds === 0 ? 'PAUSED' : status,
     remainingSeconds,
+    durationSeconds: Math.max(durationSeconds ?? remainingSeconds, remainingSeconds),
   }
 }
 

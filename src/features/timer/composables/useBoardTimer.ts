@@ -1,5 +1,6 @@
-import { computed, onBeforeUnmount, ref } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import { boardTimerClient, type BoardTimerDto } from '@/features/timer/api/boardTimerClient'
+import timerFinishedSoundSrc from '@/assets/sounds/timer_beep_similar.wav'
 
 const DEFAULT_NEW_TIMER_SECONDS = 300
 const MIN_TIMER_SECONDS = 1
@@ -39,6 +40,31 @@ export const useBoardTimer = () => {
 
   let loadRequestId = 0
   let countdownIntervalId: number | null = null
+  let timerFinishedAudio: HTMLAudioElement | null = null
+  let activeBoardId: number | null = null
+  let isAutoDeletePending = false
+  let lastForegroundSyncAt = 0
+  let isMuted = ref(false)
+
+  const playTimerFinishedSound = () => {
+    if (typeof Audio === 'undefined' || isMuted) {
+      return
+    }
+
+    try {
+      if (!timerFinishedAudio) {
+        timerFinishedAudio = new Audio(timerFinishedSoundSrc)
+        timerFinishedAudio.preload = 'auto'
+      }
+
+      timerFinishedAudio.currentTime = 0
+      void timerFinishedAudio.play().catch(() => {
+        // Browser may block autoplay without prior interaction.
+      })
+    } catch {
+      // Ignore audio playback failures.
+    }
+  }
 
   const stopCountdown = () => {
     if (countdownIntervalId === null) {
@@ -71,6 +97,8 @@ export const useBoardTimer = () => {
 
       if (nextRemainingSeconds === 0) {
         stopCountdown()
+        playTimerFinishedSound()
+        void autoDeleteExpiredTimer()
       }
     }, 1000)
   }
@@ -85,8 +113,66 @@ export const useBoardTimer = () => {
     stopCountdown()
   }
 
+  const autoDeleteExpiredTimer = async () => {
+    if (isAutoDeletePending || isActionPending.value) {
+      return
+    }
+
+    const boardId = activeBoardId
+    const currentTimer = timer.value
+    if (!boardId || !currentTimer || currentTimer.remainingSeconds > 0) {
+      return
+    }
+
+    isAutoDeletePending = true
+    isActionPending.value = true
+
+    try {
+      await boardTimerClient.deleteBoardTimer(boardId)
+      syncTimer(null)
+      isCreatePopoverOpen.value = false
+      newTimerSeconds.value = String(DEFAULT_NEW_TIMER_SECONDS)
+      timerErrorMessage.value = ''
+    } catch (error) {
+      timerErrorMessage.value =
+        error instanceof Error && error.message ? error.message : 'Не удалось удалить таймер'
+    } finally {
+      isActionPending.value = false
+      isAutoDeletePending = false
+    }
+  }
+
+  const syncActiveBoardTimer = () => {
+    const boardId = activeBoardId
+    if (!boardId || isLoadingTimer.value || isActionPending.value) {
+      return
+    }
+
+    const now = Date.now()
+    if (now - lastForegroundSyncAt < 500) {
+      return
+    }
+    lastForegroundSyncAt = now
+
+    void loadTimer(boardId).catch(() => {
+      // Error is reflected in timerErrorMessage and handled by callers when needed.
+    })
+  }
+
+  const onWindowFocus = () => {
+    syncActiveBoardTimer()
+  }
+
+  const onDocumentVisibilityChange = () => {
+    if (document.visibilityState === 'visible') {
+      syncActiveBoardTimer()
+    }
+  }
+
   const resetTimerState = () => {
     loadRequestId += 1
+    activeBoardId = null
+    isAutoDeletePending = false
     syncTimer(null)
     timerErrorMessage.value = ''
     isLoadingTimer.value = false
@@ -109,6 +195,7 @@ export const useBoardTimer = () => {
 
   const loadTimer = async (boardId: number | null) => {
     const requestId = ++loadRequestId
+    activeBoardId = boardId
     if (!boardId) {
       resetTimerState()
       return
@@ -123,6 +210,9 @@ export const useBoardTimer = () => {
       }
 
       syncTimer(currentTimer)
+      if (currentTimer && currentTimer.remainingSeconds === 0) {
+        await autoDeleteExpiredTimer()
+      }
     } catch (error) {
       if (requestId !== loadRequestId) {
         return
@@ -143,6 +233,7 @@ export const useBoardTimer = () => {
     if (!boardId || isActionPending.value) {
       return null
     }
+    activeBoardId = boardId
 
     const parsedSeconds = parseTimerSeconds(newTimerSeconds.value)
     if (parsedSeconds === null) {
@@ -153,7 +244,9 @@ export const useBoardTimer = () => {
     timerErrorMessage.value = ''
     isActionPending.value = true
     try {
-      const startedTimer = await boardTimerClient.startBoardTimer(boardId, { seconds: parsedSeconds })
+      const startedTimer = await boardTimerClient.startBoardTimer(boardId, {
+        seconds: parsedSeconds,
+      })
       syncTimer(startedTimer)
       isCreatePopoverOpen.value = false
       return startedTimer
@@ -170,6 +263,7 @@ export const useBoardTimer = () => {
     if (!boardId || isActionPending.value || !isRunning.value) {
       return null
     }
+    activeBoardId = boardId
 
     timerErrorMessage.value = ''
     isActionPending.value = true
@@ -179,7 +273,9 @@ export const useBoardTimer = () => {
       return pausedTimer
     } catch (error) {
       timerErrorMessage.value =
-        error instanceof Error && error.message ? error.message : 'Не удалось поставить таймер на паузу'
+        error instanceof Error && error.message
+          ? error.message
+          : 'Не удалось поставить таймер на паузу'
       throw error
     } finally {
       isActionPending.value = false
@@ -190,6 +286,7 @@ export const useBoardTimer = () => {
     if (!boardId || isActionPending.value || !isPaused.value) {
       return null
     }
+    activeBoardId = boardId
 
     timerErrorMessage.value = ''
     isActionPending.value = true
@@ -206,10 +303,15 @@ export const useBoardTimer = () => {
     }
   }
 
+  const toggleMuteTimer = () => {
+    isMuted.value = !isMuted.value
+  }
+
   const deleteTimer = async (boardId: number | null) => {
     if (!boardId || isActionPending.value || !hasTimer.value) {
       return false
     }
+    activeBoardId = boardId
 
     timerErrorMessage.value = ''
     isActionPending.value = true
@@ -230,6 +332,21 @@ export const useBoardTimer = () => {
 
   onBeforeUnmount(() => {
     stopCountdown()
+    if (typeof window !== 'undefined') {
+      window.removeEventListener('focus', onWindowFocus)
+    }
+    if (typeof document !== 'undefined') {
+      document.removeEventListener('visibilitychange', onDocumentVisibilityChange)
+    }
+  })
+
+  onMounted(() => {
+    if (typeof window !== 'undefined') {
+      window.addEventListener('focus', onWindowFocus)
+    }
+    if (typeof document !== 'undefined') {
+      document.addEventListener('visibilitychange', onDocumentVisibilityChange)
+    }
   })
 
   return {
@@ -251,5 +368,7 @@ export const useBoardTimer = () => {
     resetTimerState,
     openCreatePopover,
     closeCreatePopover,
+    toggleMuteTimer,
+    isMuted,
   }
 }

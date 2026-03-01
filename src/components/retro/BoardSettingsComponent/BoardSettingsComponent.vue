@@ -51,101 +51,15 @@
         :disabled="isCardsVisibilityUpdating"
         @click="onToggleCardsVisibilityClick"
       >
+        <span v-if="isAllCardsHidden">Показать</span>
+        <span v-else>Скрыть</span>
         <SvgIcon :name="cardsVisibilityIconName" class="board-cards-visibility-button__icon" />
       </button>
 
-      <div class="board-timer" :class="{ 'board-timer--loading': boardTimer.isLoadingTimer.value }">
-        <button
-          v-if="!boardTimer.hasTimer.value"
-          type="button"
-          class="board-action-button board-timer__create-button"
-          :disabled="
-            boardTimer.isActionPending.value || boardTimer.isLoadingTimer.value || !currentBoardId
-          "
-          @click="onOpenCreateTimerPopover"
-        >
-          Таймер
-        </button>
-
-        <div
-          v-if="!boardTimer.hasTimer.value && boardTimer.isCreatePopoverOpen.value"
-          class="board-timer-popover"
-        >
-          <label class="board-timer-popover__label" for="board-timer-seconds-input">Секунды</label>
-          <input
-            id="board-timer-seconds-input"
-            v-model="boardTimer.newTimerSeconds.value"
-            class="board-timer-popover__input"
-            type="number"
-            min="1"
-            max="86400"
-            step="1"
-            placeholder="300"
-            @keydown.enter.prevent="onStartTimer"
-          />
-          <div class="board-timer-popover__actions">
-            <button
-              type="button"
-              class="board-timer-popover__button board-timer-popover__button--primary"
-              :disabled="boardTimer.isActionPending.value || !currentBoardId"
-              @click="onStartTimer"
-            >
-              Старт
-            </button>
-            <button
-              type="button"
-              class="board-timer-popover__button"
-              :disabled="boardTimer.isActionPending.value"
-              @click="boardTimer.closeCreatePopover"
-            >
-              Отмена
-            </button>
-          </div>
-        </div>
-
-        <div v-else-if="boardTimer.hasTimer.value" class="board-timer__current">
-          <div class="board-timer__meta">
-            <span class="board-timer__time">{{ boardTimer.formattedTime.value }}</span>
-            <span class="board-timer__status">{{ boardTimer.timer.value?.status }}</span>
-          </div>
-          <div class="board-timer__actions">
-            <button
-              v-if="boardTimer.isRunning.value"
-              type="button"
-              class="board-action-button"
-              :disabled="boardTimer.isActionPending.value || !currentBoardId"
-              @click="onPauseTimer"
-            >
-              Пауза
-            </button>
-            <button
-              v-else-if="boardTimer.isPaused.value"
-              type="button"
-              class="board-action-button"
-              :disabled="boardTimer.isActionPending.value || !currentBoardId"
-              @click="onResumeTimer"
-            >
-              Продолжить
-            </button>
-            <button
-              type="button"
-              class="board-action-button board-timer__delete-button"
-              :disabled="boardTimer.isActionPending.value || !currentBoardId"
-              title="Удалить таймер"
-              aria-label="Удалить таймер"
-              @click="onDeleteTimer"
-            >
-              <SvgIcon name="trash" class="board-timer__delete-icon" />
-            </button>
-          </div>
-        </div>
-      </div>
+      <BoardTimerControl :board-id="currentBoardId" />
 
       <BoardShareControl />
     </div>
-    <p v-if="boardTimer.timerErrorMessage.value" class="board-timer-error">
-      {{ boardTimer.timerErrorMessage.value }}
-    </p>
   </section>
 </template>
 
@@ -160,15 +74,12 @@ import {
 import type { RetroBoardSummary } from '@/features/teams/types'
 import { useRetroStore } from '@/stores/RetroStore'
 import SvgIcon from '@/components/common/SvgIcon/SvgIcon.vue'
-import { useBoardNotifications } from '@/composables/useBoardNotifications'
-import { useBoardTimer } from '@/features/timer/composables/useBoardTimer'
+import BoardTimerControl from './BoardTimerControl.vue'
 import BoardShareControl from './BoardShareControl.vue'
 
 const retroStore = useRetroStore()
-const { pushNotification } = useBoardNotifications()
 const route = useRoute()
 const router = useRouter()
-const boardTimer = useBoardTimer()
 const teamBoards = ref<RetroBoardSummary[]>([])
 const isBoardNavigationLoading = ref(false)
 const isCardsVisibilityUpdating = ref(false)
@@ -317,73 +228,10 @@ const onToggleCardsVisibilityClick = async () => {
   }
 }
 
-const onOpenCreateTimerPopover = () => {
-  boardTimer.openCreatePopover()
-}
-
-const onStartTimer = async () => {
-  try {
-    const startedTimer = await boardTimer.startTimer(currentBoardId.value)
-    if (startedTimer) {
-      pushNotification('success', 'Таймер запущен')
-    }
-  } catch (error) {
-    const message =
-      error instanceof Error && error.message ? error.message : 'Не удалось запустить таймер'
-    pushNotification('error', message)
-  }
-}
-
-const onPauseTimer = async () => {
-  try {
-    const pausedTimer = await boardTimer.pauseTimer(currentBoardId.value)
-    if (pausedTimer) {
-      pushNotification('info', 'Таймер на паузе')
-    }
-  } catch (error) {
-    const message =
-      error instanceof Error && error.message
-        ? error.message
-        : 'Не удалось поставить таймер на паузу'
-    pushNotification('error', message)
-  }
-}
-
-const onResumeTimer = async () => {
-  try {
-    const resumedTimer = await boardTimer.resumeTimer(currentBoardId.value)
-    if (resumedTimer) {
-      pushNotification('success', 'Таймер продолжен')
-    }
-  } catch (error) {
-    const message =
-      error instanceof Error && error.message ? error.message : 'Не удалось продолжить таймер'
-    pushNotification('error', message)
-  }
-}
-
-const onDeleteTimer = async () => {
-  try {
-    const wasDeleted = await boardTimer.deleteTimer(currentBoardId.value)
-    if (wasDeleted) {
-      pushNotification('success', 'Таймер удален')
-    }
-  } catch (error) {
-    const message =
-      error instanceof Error && error.message ? error.message : 'Не удалось удалить таймер'
-    pushNotification('error', message)
-  }
-}
-
 watch(
   currentBoardId,
   (boardId) => {
     void loadTeamBoardsNavigation(boardId)
-    void boardTimer.loadTimer(boardId).catch((error) => {
-      const message =
-        error instanceof Error && error.message ? error.message : 'Не удалось загрузить таймер'
-      pushNotification('error', message)
-    })
   },
   { immediate: true },
 )
@@ -471,9 +319,8 @@ watch(
 }
 
 .board-cards-visibility-button {
-  width: 36px;
   justify-content: center;
-  padding: 0;
+  padding: 0 9px;
 }
 
 .board-cards-visibility-button__icon {
@@ -522,136 +369,6 @@ watch(
   /* margin-right: auto; */
 }
 
-.board-timer {
-  position: relative;
-  display: inline-flex;
-  align-items: center;
-  min-height: 36px;
-}
-
-.board-timer--loading {
-  opacity: 0.7;
-}
-
-.board-timer__create-button {
-  min-width: 130px;
-}
-
-.board-timer-popover {
-  position: absolute;
-  top: calc(100% + 8px);
-  left: 0;
-  z-index: 20;
-  width: 220px;
-  border: 1px solid #d0ddec;
-  border-radius: 10px;
-  background: #fff;
-  box-shadow: 0 10px 26px rgba(19, 38, 68, 0.16);
-  padding: 10px;
-  display: grid;
-  gap: 8px;
-}
-
-.board-timer-popover__label {
-  font-size: 12px;
-  color: #52617a;
-}
-
-.board-timer-popover__input {
-  width: 100%;
-  box-sizing: border-box;
-  border: 1px solid #c8d4e3;
-  border-radius: 8px;
-  padding: 8px 10px;
-  font-size: 13px;
-  color: #223049;
-}
-
-.board-timer-popover__input:focus {
-  outline: none;
-  border-color: #8ab4ff;
-  box-shadow: 0 0 0 3px rgba(138, 180, 255, 0.2);
-}
-
-.board-timer-popover__actions {
-  display: flex;
-  gap: 8px;
-}
-
-.board-timer-popover__button {
-  flex: 1;
-  height: 32px;
-  border: 1px solid #c8d4e3;
-  border-radius: 8px;
-  background: #fff;
-  color: #2f3647;
-  cursor: pointer;
-}
-
-.board-timer-popover__button:disabled {
-  opacity: 0.7;
-  cursor: not-allowed;
-}
-
-.board-timer-popover__button--primary {
-  background: #1e88e5;
-  border-color: #1e88e5;
-  color: #fff;
-}
-
-.board-timer__current {
-  height: 36px;
-  border: 1px solid #c8d4e3;
-  border-radius: 8px;
-  background: #fff;
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  padding: 0 8px;
-}
-
-.board-timer__meta {
-  display: inline-flex;
-  align-items: baseline;
-  gap: 8px;
-}
-
-.board-timer__time {
-  font-size: 14px;
-  font-weight: 700;
-  color: #1b2f4f;
-  min-width: 48px;
-}
-
-.board-timer__status {
-  font-size: 10px;
-  letter-spacing: 0.05em;
-  color: #5a6780;
-}
-
-.board-timer__actions {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-}
-
-.board-timer__delete-button {
-  width: 32px;
-  padding: 0;
-  justify-content: center;
-}
-
-.board-timer__delete-icon {
-  width: 14px;
-  height: 14px;
-}
-
-.board-timer-error {
-  margin: 4px var(--teams-page-padding, 20px) 0;
-  color: #b3261e;
-  font-size: 12px;
-}
-
 @media (max-width: 768px) {
   .board-settings-strip {
     height: auto;
@@ -667,19 +384,6 @@ watch(
   }
 
   .board-search__input {
-    width: 100%;
-  }
-
-  .board-timer {
-    width: 100%;
-  }
-
-  .board-timer__create-button,
-  .board-timer__current {
-    width: 100%;
-  }
-
-  .board-timer-popover {
     width: 100%;
   }
 
