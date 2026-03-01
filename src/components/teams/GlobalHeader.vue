@@ -84,24 +84,33 @@ onBeforeUnmount(() => {
 
 <template>
   <header class="teams-top-strip">
-    <div class="teams-top-strip-inner" :class="{ 'teams-top-strip-inner-full-width': props.fullWidth }">
+    <div
+      class="teams-top-strip-inner"
+      :class="{ 'teams-top-strip-inner-full-width': props.fullWidth }"
+    >
       <RouterLink class="teams-top-strip-logo-link" to="/teams" aria-label="Перейти к командам">
         <img class="teams-top-strip-logo" :src="logoSrc" alt="Logo" />
       </RouterLink>
 
       <div v-if="props.centerTitle" class="teams-top-strip-center-title" :title="props.centerTitle">
-        <span class="teams-top-strip-center-title-text">
-          {{ props.centerTitle }}
-        </span>
-        <button
-          v-if="props.canEditCenterTitle"
-          class="teams-top-strip-center-title-edit"
-          type="button"
-          aria-label="Редактировать название доски"
-          @click="emit('edit-center-title')"
-        >
-          <SvgIcon name="pencile" class="teams-top-strip-center-title-edit-icon" />
-        </button>
+        <div class="teams-top-strip-center-title-edit-zone">
+          <span
+            class="teams-top-strip-center-title-text"
+            title="Изменить название доски"
+            @click="emit('edit-center-title')"
+          >
+            {{ props.centerTitle }}
+          </span>
+          <button
+            v-if="props.canEditCenterTitle"
+            class="teams-top-strip-center-title-edit"
+            type="button"
+            aria-label="Редактировать название доски"
+            @click="emit('edit-center-title')"
+          >
+            <SvgIcon name="pencile" class="teams-top-strip-center-title-edit-icon" />
+          </button>
+        </div>
       </div>
 
       <div ref="menuRootRef" class="teams-user-menu">
@@ -201,9 +210,13 @@ onBeforeUnmount(() => {
   left: 50%;
   transform: translateX(-50%);
   max-width: min(70vw, 620px);
+}
+
+.teams-top-strip-center-title-edit-zone {
   display: inline-flex;
   align-items: center;
-  gap: 8px;
+  gap: 6px;
+  padding-right: 6px;
 }
 
 .teams-top-strip-center-title-text {
@@ -226,6 +239,17 @@ onBeforeUnmount(() => {
   display: inline-flex;
   align-items: center;
   justify-content: center;
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+  transition: opacity 0.16s ease;
+}
+
+.teams-top-strip-center-title-edit-zone:hover .teams-top-strip-center-title-edit,
+.teams-top-strip-center-title-edit-zone:focus-within .teams-top-strip-center-title-edit {
+  opacity: 1;
+  visibility: visible;
+  pointer-events: auto;
 }
 
 .teams-top-strip-center-title-edit:hover {

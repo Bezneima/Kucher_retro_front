@@ -16,6 +16,32 @@ const resolveBoardId = (boardId: MaybeRef<number | null | undefined>) => {
     : null
 }
 
+const copyTextFallback = (text: string) => {
+  if (typeof document === 'undefined') {
+    return false
+  }
+
+  const textarea = document.createElement('textarea')
+  textarea.value = text
+  textarea.setAttribute('readonly', '')
+  textarea.style.position = 'fixed'
+  textarea.style.opacity = '0'
+  textarea.style.pointerEvents = 'none'
+  textarea.style.left = '-9999px'
+
+  document.body.appendChild(textarea)
+  textarea.select()
+  textarea.setSelectionRange(0, text.length)
+
+  try {
+    return document.execCommand('copy')
+  } catch {
+    return false
+  } finally {
+    document.body.removeChild(textarea)
+  }
+}
+
 export const useBoardShareLink = (boardId: MaybeRef<number | null | undefined>) => {
   const shareLink = ref<ShareLinkResponse | null>(null)
   const isModalOpen = ref(false)
@@ -141,11 +167,15 @@ export const useBoardShareLink = (boardId: MaybeRef<number | null | undefined>) 
     }
 
     try {
-      await navigator.clipboard.writeText(nextShareUrl)
-      return true
+      if (typeof navigator !== 'undefined' && navigator.clipboard?.writeText) {
+        await navigator.clipboard.writeText(nextShareUrl)
+        return true
+      }
+
+      return copyTextFallback(nextShareUrl)
     } catch (error) {
       console.error('[invite] failed to copy share link', error)
-      return false
+      return copyTextFallback(nextShareUrl)
     }
   }
 

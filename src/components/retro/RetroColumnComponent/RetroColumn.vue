@@ -27,7 +27,23 @@
         </span>
       </div>
       <div class="column-header__title-container">
-        <span class="column-header__title" @click="onEditColumnClick">{{ column.name }}</span>
+        <div class="column-header__title-edit-zone">
+          <span
+            class="column-header__title"
+            title="Изменить название колонки"
+            @click="onEditColumnClick"
+            >{{ column.name }}</span
+          >
+          <button
+            class="column-header__title-edit"
+            type="button"
+            title="Изменить название колонки"
+            aria-label="Изменить название колонки"
+            @click="onEditColumnClick"
+          >
+            <SvgIcon name="pencile" class="column-header__title-edit-icon" />
+          </button>
+        </div>
       </div>
       <div v-if="column.description" class="column-description">{{ column.description }}</div>
       <RetroColumnMenu
@@ -43,7 +59,12 @@
         @remove-color="onRemoveColumnColor"
         @delete-column="onDeleteColumn"
       />
-      <button class="column-add-button" type="button" @click="onAddItemClick">
+      <button
+        class="column-add-button"
+        type="button"
+        title="Добавить карточку в колонку"
+        @click="onAddItemClick"
+      >
         <SvgIcon name="bigplus" class="column-add-button__icon" />
       </button>
     </div>
@@ -201,7 +222,8 @@ const updateScrollShadows = () => {
   const maxScrollTop = container.scrollHeight - container.clientHeight
   const effectiveScrollableHeight = maxScrollTop - BOTTOM_SCROLL_SPACER_PX
   showTopScrollShadow.value = container.scrollTop > 1
-  showBottomScrollShadow.value = effectiveScrollableHeight > 1 && container.scrollTop < effectiveScrollableHeight - 1
+  showBottomScrollShadow.value =
+    effectiveScrollableHeight > 1 && container.scrollTop < effectiveScrollableHeight - 1
 }
 
 const syncScrollShadows = () => {
@@ -467,6 +489,13 @@ const onCreateGroupClick = async () => {
   margin-top: 16px;
 }
 
+.column-header__title-edit-zone {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding-right: 6px;
+}
+
 .column-header {
   flex: 1;
   display: flex;
@@ -480,7 +509,44 @@ const onCreateGroupClick = async () => {
   font-weight: 500;
   line-height: 1.4;
   color: #7a7a7a;
+  cursor: text;
+  transition: color 0.16s ease;
+}
+
+.column-header__title:hover {
+  color: #5f5f5f;
+}
+
+.column-header__title-edit {
+  border: none;
+  background: transparent;
+  padding: 0;
+  margin: 0;
+  color: #7a7a7a;
   cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+  transition: opacity 0.16s ease, color 0.16s ease;
+}
+
+.column-header__title-edit-zone:hover .column-header__title-edit,
+.column-header__title-edit-zone:focus-within .column-header__title-edit {
+  opacity: 1;
+  visibility: visible;
+  pointer-events: auto;
+}
+
+.column-header__title-edit:hover {
+  color: #5f5f5f;
+}
+
+.column-header__title-edit-icon {
+  width: 14px;
+  height: 14px;
 }
 
 .column-drag-handle {
@@ -543,6 +609,10 @@ const onCreateGroupClick = async () => {
   justify-content: center;
   font-size: 13px;
   gap: 6px;
+  transition:
+    border-color 0.16s ease,
+    color 0.16s ease,
+    background-color 0.16s ease;
 }
 
 .column-add-button:hover {

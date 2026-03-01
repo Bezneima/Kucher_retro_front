@@ -13,15 +13,27 @@
       @mouseenter="onDragHandleMouseEnter"
       @mouseleave="onDragHandleMouseLeave"
     >
-      <button
-        type="button"
-        class="retro-group-title"
-        title="Изменить название группы"
-        @mousedown.stop
-        @click="onGroupTitleClick"
-      >
-        {{ group.name }}
-      </button>
+      <div class="retro-group-title-edit-zone">
+        <button
+          type="button"
+          class="retro-group-title"
+          title="Изменить название группы"
+          @mousedown.stop
+          @click="onGroupTitleClick"
+        >
+          {{ group.name }}
+        </button>
+        <button
+          type="button"
+          class="retro-group-title-edit"
+          title="Изменить название группы"
+          aria-label="Изменить название группы"
+          @mousedown.stop
+          @click="onGroupTitleClick"
+        >
+          <SvgIcon name="pencile" class="retro-group-title-edit-icon" />
+        </button>
+      </div>
       <button
         ref="menuButtonRef"
         type="button"
@@ -44,7 +56,12 @@
       @delete-group="openDeleteModal"
     />
 
-    <button type="button" class="retro-group-add-item" @click="onAddItemToGroupClick">
+    <button
+      type="button"
+      class="retro-group-add-item"
+      title="Добавить карточку в группу"
+      @click="onAddItemToGroupClick"
+    >
       <SvgIcon name="bigplus" class="retro-group-add-item__icon" />
     </button>
 
@@ -359,6 +376,13 @@ const onDragHandleMouseLeave = () => {
   gap: 8px;
 }
 
+.retro-group-title-edit-zone {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding-right: 6px;
+}
+
 .retro-group-title {
   margin: 0;
   padding: 0;
@@ -369,6 +393,44 @@ const onDragHandleMouseLeave = () => {
   color: #7a7a7a;
   cursor: text;
   text-align: left;
+  transition: color 0.16s ease;
+}
+
+.retro-group-title:hover {
+  color: #5f5f5f;
+}
+
+.retro-group-title-edit {
+  border: none;
+  background: transparent;
+  padding: 0;
+  margin: 0;
+  color: #7a7a7a;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+  transition: opacity 0.16s ease, color 0.16s ease;
+}
+
+.retro-group-title-edit-zone:hover .retro-group-title-edit,
+.retro-group-title-edit-zone:focus-within .retro-group-title-edit {
+  opacity: 1;
+  visibility: visible;
+  pointer-events: auto;
+}
+
+.retro-group-title-edit:hover {
+  color: #5f5f5f;
+}
+
+.retro-group-title-edit-icon {
+  width: 12px;
+  height: 12px;
+  display: block;
 }
 
 .retro-group-title:focus-visible {
@@ -378,9 +440,9 @@ const onDragHandleMouseLeave = () => {
 }
 
 .retro-group-open-menu-button {
-  width: 16px;
-  height: 16px;
-  padding: 4px;
+  width: 20px;
+  height: 20px;
+  padding: 0;
   border: none;
   border-radius: 4px;
   background: transparent;
@@ -396,8 +458,8 @@ const onDragHandleMouseLeave = () => {
 }
 
 .retro-group-open-menu-button__icon {
-  width: 100%;
-  height: 100%;
+  width: 12px;
+  height: 12px;
   display: block;
 }
 
@@ -409,23 +471,34 @@ const onDragHandleMouseLeave = () => {
 }
 
 .retro-group-add-item {
-  margin-top: 10px;
+  margin-top: 12px;
   width: 100%;
-  border: 1px dashed var(--group-button-bg);
-  border-radius: 8px;
-  height: 32px;
+  height: 42px;
+  border: 2px dashed var(--group-button-bg);
+  border-radius: 10px;
   background: transparent;
   color: var(--group-button-bg);
-  font-size: 12px;
   cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: center;
+  font-size: 13px;
+  gap: 6px;
+  transition:
+    border-color 0.16s ease,
+    color 0.16s ease,
+    background-color 0.16s ease;
+}
+
+.retro-group-add-item:hover {
+  border-color: color-mix(in srgb, var(--group-button-bg) 85%, black);
+  color: color-mix(in srgb, var(--group-button-bg) 85%, black);
+  background-color: color-mix(in srgb, var(--group-button-bg) 40%, transparent);
 }
 
 .retro-group-add-item__icon {
-  width: 20px !important;
-  height: 20px !important;
+  width: 24px !important;
+  height: 24px !important;
   stroke-width: 5px !important;
   display: block;
 }
