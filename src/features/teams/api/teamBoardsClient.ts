@@ -10,8 +10,10 @@ import type {
   RetroBoardSummaryColumn,
   RetroBoardSummaryItem,
   TeamMember,
+  TeamAnonymousBoardAccessResponse,
   TeamRole,
   TeamSummary,
+  UpdateTeamAnonymousBoardAccessRequest,
   UpdateTeamRequest,
   UpdateTeamMemberRoleRequest,
 } from '../types'
@@ -194,6 +196,9 @@ const normalizeTeam = (payload: unknown): TeamSummary | null => {
     id,
     name: asString(root.name) ?? `Team ${id}`,
     role: getRole(payload.role ?? root.role ?? payload.membershipRole),
+    isAnonymousBoardAccessEnabled: asBoolean(
+      root.isAnonymousBoardAccessEnabled ?? payload.isAnonymousBoardAccessEnabled,
+    ),
   }
 }
 
@@ -270,6 +275,31 @@ const normalizeTeamCardsVisibilitySettings = (
       typeof payload.isAllCardsHidden === 'boolean'
         ? payload.isAllCardsHidden
         : fallbackIsAllCardsHidden,
+    updatedAt: asString(payload.updatedAt) ?? '',
+  }
+}
+
+const normalizeTeamAnonymousBoardAccessResponse = (
+  payload: unknown,
+  fallbackTeamId: number,
+  fallbackIsAnonymousBoardAccessEnabled: boolean,
+): TeamAnonymousBoardAccessResponse => {
+  if (!isRecord(payload)) {
+    return {
+      id: fallbackTeamId,
+      isAnonymousBoardAccessEnabled: fallbackIsAnonymousBoardAccessEnabled,
+      updatedAt: '',
+    }
+  }
+
+  const id = asPositiveNumber(payload.id) ?? fallbackTeamId
+
+  return {
+    id,
+    isAnonymousBoardAccessEnabled:
+      typeof payload.isAnonymousBoardAccessEnabled === 'boolean'
+        ? payload.isAnonymousBoardAccessEnabled
+        : fallbackIsAnonymousBoardAccessEnabled,
     updatedAt: asString(payload.updatedAt) ?? '',
   }
 }
@@ -354,6 +384,21 @@ export const teamsApiClient = {
       return normalizeTeam(response.data)
     } catch (error) {
       throw toTeamBoardsApiError(error, 'Не удалось обновить команду')
+    }
+  },
+  async updateTeamAnonymousBoardAccess(
+    teamId: number,
+    payload: UpdateTeamAnonymousBoardAccessRequest,
+  ): Promise<TeamAnonymousBoardAccessResponse> {
+    try {
+      const response = await httpClient.patch(`/teams/${teamId}/anonymous-board-access`, payload)
+      return normalizeTeamAnonymousBoardAccessResponse(
+        response.data,
+        teamId,
+        payload.isAnonymousBoardAccessEnabled,
+      )
+    } catch (error) {
+      throw toTeamBoardsApiError(error, 'Не удалось обновить настройки анонимного доступа')
     }
   },
   async updateTeamCardsVisibility(

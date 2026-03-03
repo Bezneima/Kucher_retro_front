@@ -1,5 +1,6 @@
 import { httpClient } from '@/api/httpClient'
 import { retroBoardService } from '@/api/services/retroBoardService'
+import { getAccessToken } from '@/auth/session'
 import { renameBoard } from '@/shared/socket'
 import { normalizeColumns } from '../helpers/normalize'
 import { reorderColumnsByPayloadIds } from '../helpers/reorderColumns'
@@ -28,12 +29,24 @@ const asBoolean = (value: unknown): boolean => {
   return value === true
 }
 
-const extractTeamRoleFromBoardPayload = (payload: unknown): TRetroUserBoardRole | null => {
+const resolveBoardPayload = (payload: unknown): TRecord | null => {
   if (!isRecord(payload)) {
     return null
   }
 
-  const boardPayload = payload
+  if (isRecord(payload.board)) {
+    return payload.board
+  }
+
+  return payload
+}
+
+const extractTeamRoleFromBoardPayload = (payload: unknown): TRetroUserBoardRole | null => {
+  const boardPayload = resolveBoardPayload(payload)
+  if (!boardPayload) {
+    return null
+  }
+
   const teamPayload = isRecord(boardPayload.team) ? boardPayload.team : undefined
 
   return normalizeUserBoardRole(
@@ -42,20 +55,48 @@ const extractTeamRoleFromBoardPayload = (payload: unknown): TRetroUserBoardRole 
 }
 
 const extractTeamIdFromBoardPayload = (payload: unknown): number | null => {
-  if (!isRecord(payload)) {
+  const boardPayload = resolveBoardPayload(payload)
+  if (!boardPayload) {
     return null
   }
 
-  const teamPayload = isRecord(payload.team) ? payload.team : undefined
-  return asPositiveNumber(payload.teamId ?? teamPayload?.id)
+  const teamPayload = isRecord(boardPayload.team) ? boardPayload.team : undefined
+  return asPositiveNumber(boardPayload.teamId ?? teamPayload?.id)
 }
 
 const extractIsAllCardsHiddenFromBoardPayload = (payload: unknown): boolean => {
-  if (!isRecord(payload)) {
+  const boardPayload = resolveBoardPayload(payload)
+  if (!boardPayload) {
     return false
   }
 
-  return asBoolean(payload.isAllCardsHidden)
+  return asBoolean(boardPayload.isAllCardsHidden)
+}
+
+const extractOptionalIsAllCardsHiddenFromBoardPayload = (payload: unknown): boolean | null => {
+  const boardPayload = resolveBoardPayload(payload)
+  if (!boardPayload || typeof boardPayload.isAllCardsHidden !== 'boolean') {
+    return null
+  }
+
+  return boardPayload.isAllCardsHidden
+}
+
+const extractColumnsPayload = (payload: unknown): unknown[] => {
+  if (Array.isArray(payload)) {
+    return payload
+  }
+
+  const boardPayload = resolveBoardPayload(payload)
+  if (!boardPayload) {
+    return []
+  }
+
+  if (Array.isArray(boardPayload.columns)) {
+    return boardPayload.columns
+  }
+
+  return []
 }
 
 const extractCollectionPayload = (payload: unknown): unknown[] => {
@@ -107,6 +148,9 @@ const resolveCurrentUserBoardRole = async (boardPayload: unknown): Promise<TRetr
 
   const boardTeamId = extractTeamIdFromBoardPayload(boardPayload)
   if (!boardTeamId) {
+    return null
+  }
+  if (!getAccessToken()) {
     return null
   }
 
@@ -191,7 +235,7 @@ export const boardActions = {
       board.columns = this.normalizeColumns(boardWithColumns.columns)
     } else {
       const columnsPayload = await retroBoardService.getBoardColumns(boardId)
-      board.columns = this.normalizeColumns(columnsPayload)
+      board.columns = this.normalizeColumns(extractColumnsPayload(columnsPayload))
     }
 
     this.board = [board]
@@ -217,15 +261,26 @@ export const boardActions = {
   async loadBoardById(this: TBoardActionsContext, boardId: number) {
     this.isBoardLoading = true
     try {
-      const [boardsResponse, columnsResponse] = await Promise.all([
-        httpClient.get('/retro/boards'),
-        retroBoardService.getBoardColumns(boardId),
-      ])
+      const columnsResponse = await retroBoardService.getBoardColumns(boardId)
+      let rawBoard: Partial<TRetroBoard> | undefined
 
-      const boardsData = Array.isArray(boardsResponse.data) ? boardsResponse.data : []
-      const rawBoard = boardsData.find(
-        (item) => Number((item as Partial<TRetroBoard>)?.id) === boardId,
-      ) as Partial<TRetroBoard> | undefined
+      if (getAccessToken()) {
+        try {
+          const boardsResponse = await httpClient.get('/retro/boards')
+          const boardsData = Array.isArray(boardsResponse.data) ? boardsResponse.data : []
+          rawBoard = boardsData.find(
+            (item) => Number((item as Partial<TRetroBoard>)?.id) === boardId,
+          ) as Partial<TRetroBoard> | undefined
+        } catch (error) {
+          console.error('[retro] failed to load board list for board by id', boardId, error)
+        }
+      }
+
+      const columnsBoardPayload = resolveBoardPayload(columnsResponse)
+      if (!rawBoard && columnsBoardPayload) {
+        rawBoard = columnsBoardPayload as Partial<TRetroBoard>
+      }
+
       this.currentUserTeamRole = await resolveCurrentUserBoardRole(rawBoard)
 
       const board: TRetroBoard = {
@@ -235,7 +290,7 @@ export const boardActions = {
         date: typeof rawBoard?.date === 'string' ? rawBoard.date : '',
         description: typeof rawBoard?.description === 'string' ? rawBoard.description : '',
         isAllCardsHidden: extractIsAllCardsHiddenFromBoardPayload(rawBoard),
-        columns: this.normalizeColumns(columnsResponse),
+        columns: this.normalizeColumns(extractColumnsPayload(columnsResponse)),
       }
 
       this.board = [board]
@@ -249,6 +304,7 @@ export const boardActions = {
       this.commentsByItemId = {}
       this.commentItemIdByCommentId = {}
       this.lastSyncedPositions = {}
+      throw error
     } finally {
       this.isBoardLoading = false
     }
@@ -265,7 +321,11 @@ export const boardActions = {
 
     try {
       const columnsPayload = await retroBoardService.getBoardColumns(boardId)
-      currentBoard.columns = this.normalizeColumns(columnsPayload)
+      currentBoard.columns = this.normalizeColumns(extractColumnsPayload(columnsPayload))
+      const nextIsAllCardsHidden = extractOptionalIsAllCardsHiddenFromBoardPayload(columnsPayload)
+      if (nextIsAllCardsHidden != null) {
+        currentBoard.isAllCardsHidden = nextIsAllCardsHidden
+      }
       this.board = [{ ...currentBoard }]
       this.setLastSyncedPositions()
     } catch (error) {

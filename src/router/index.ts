@@ -28,11 +28,17 @@ const router = createRouter({
       path: '/boards/:id',
       name: 'board',
       component: RoomPage,
+      meta: {
+        public: true,
+      },
     },
     {
       path: '/retro/boards/:id',
       name: 'retro-board',
       component: RoomPage,
+      meta: {
+        public: true,
+      },
     },
     {
       path: '/invite/:code',

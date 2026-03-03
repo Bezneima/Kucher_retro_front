@@ -6,6 +6,7 @@ export type TeamSummary = {
   id: number
   name: string
   role: TeamRole
+  isAnonymousBoardAccessEnabled: boolean
 }
 
 export type TeamMember = {
@@ -50,6 +51,16 @@ export type CreateTeamRequest = {
 
 export type UpdateTeamRequest = {
   name: string
+}
+
+export type UpdateTeamAnonymousBoardAccessRequest = {
+  isAnonymousBoardAccessEnabled: boolean
+}
+
+export type TeamAnonymousBoardAccessResponse = {
+  id: number
+  isAnonymousBoardAccessEnabled: boolean
+  updatedAt: string
 }
 
 export type AddTeamMemberRequest = {

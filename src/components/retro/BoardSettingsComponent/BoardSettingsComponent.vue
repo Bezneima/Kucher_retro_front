@@ -58,7 +58,10 @@
 
       <BoardTimerControl :board-id="currentBoardId" />
 
-      <BoardShareControl />
+      <div v-if="canManageBoard" class="board-team-actions">
+        <TeamBoardSettingsControl :team-id="currentTeamId" />
+        <BoardShareControl />
+      </div>
     </div>
   </section>
 </template>
@@ -66,6 +69,7 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
+import { getAccessToken } from '@/auth/session'
 import {
   retroBoardsApiClient,
   teamsApiClient,
@@ -76,6 +80,7 @@ import { useRetroStore } from '@/stores/RetroStore'
 import SvgIcon from '@/components/common/SvgIcon/SvgIcon.vue'
 import BoardTimerControl from './BoardTimerControl.vue'
 import BoardShareControl from './BoardShareControl.vue'
+import TeamBoardSettingsControl from './TeamBoardSettingsControl.vue'
 
 const retroStore = useRetroStore()
 const route = useRoute()
@@ -83,6 +88,7 @@ const router = useRouter()
 const teamBoards = ref<RetroBoardSummary[]>([])
 const isBoardNavigationLoading = ref(false)
 const isCardsVisibilityUpdating = ref(false)
+const hasAccessToken = computed(() => Boolean(getAccessToken()))
 
 const getBoardTimestamp = (value: string | null) => {
   if (!value) {
@@ -159,7 +165,7 @@ const resolveBoardRouteName = () => {
 }
 
 const loadTeamBoardsNavigation = async (boardId: number | null) => {
-  if (!boardId) {
+  if (!boardId || !hasAccessToken.value) {
     teamBoards.value = []
     return
   }
@@ -369,6 +375,17 @@ watch(
   /* margin-right: auto; */
 }
 
+.board-team-actions {
+  margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+:deep(.board-team-actions .board-share-trigger) {
+  margin-left: 0;
+}
+
 @media (max-width: 768px) {
   .board-settings-strip {
     height: auto;
@@ -394,6 +411,12 @@ watch(
 
   .board-nav-button--next {
     margin-right: 0;
+  }
+
+  .board-team-actions {
+    margin-left: 0;
+    width: 100%;
+    justify-content: flex-end;
   }
 }
 </style>

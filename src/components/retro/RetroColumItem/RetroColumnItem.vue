@@ -51,15 +51,31 @@
         <span v-if="formattedCreatedAt" class="card-footer-date">{{ formattedCreatedAt }}</span>
 
         <div class="card-footer-actions">
-          <div class="card-footer-like-container" @click="onLikeButtonClick">
-            <button :class="['card-footer-button', { 'card-footer-button-liked': isLikedByMe }]">
+          <div
+            :class="[
+              'card-footer-like-container',
+              { 'card-footer-like-container-disabled': !canLikeItem },
+            ]"
+            @click.stop
+          >
+            <button
+              type="button"
+              :class="['card-footer-button', { 'card-footer-button-liked': isLikedByMe }]"
+              :disabled="!canLikeItem"
+              :aria-disabled="!canLikeItem"
+              :title="canLikeItem ? 'Поставить лайк' : 'Только для авторизованных пользователей'"
+              @click="onLikeButtonClick"
+            >
               <SvgIcon v-if="isLikedByMe" name="filledLike" class="card-footer-button-icon" />
               <SvgIcon v-else name="like" class="card-footer-button-icon" />
             </button>
             <span
               :class="[
                 'card-footer-button-likes-count',
-                { 'card-footer-button-likes-count-liked': isLikedByMe },
+                {
+                  'card-footer-button-likes-count-liked': isLikedByMe,
+                  'card-footer-button-likes-count-disabled': !canLikeItem,
+                },
               ]"
             >
               {{ element.likes.length }}
@@ -342,6 +358,10 @@
   }
 }
 
+.card-footer-button:disabled {
+  cursor: not-allowed;
+}
+
 .card-footer-button-liked {
   color: white;
 }
@@ -357,6 +377,10 @@
   align-items: center;
   cursor: pointer;
   gap: 2px;
+}
+
+.card-footer-like-container-disabled {
+  cursor: not-allowed;
 }
 
 .card-footer-comment-container {
@@ -403,6 +427,11 @@
 .card-footer-button-likes-count-liked {
   color: white;
   font-weight: 600;
+}
+
+.card-footer-button-likes-count-disabled {
+  cursor: not-allowed;
+  opacity: 0.75;
 }
 
 .card-show-comments-hint {
@@ -691,6 +720,7 @@ import {
   toRetroCommentsApiError,
   type RetroItemCommentResponseDto,
 } from '@/api/services/retroCommentsService'
+import { getAccessToken } from '@/auth/session'
 import ConfirmDeleteModal from '@/components/common/ConfirmDeleteModal/ConfirmDeleteModal.vue'
 import SvgIcon from '@/components/common/SvgIcon/SvgIcon.vue'
 import { useRetroStore } from '@/stores/RetroStore'
@@ -750,6 +780,11 @@ const isAnyCommentActionPending = computed(() => {
 const canCreateComment = computed(() => {
   if (props.element.isDraft) return false
   return newCommentText.value.trim().length > 0
+})
+
+const canLikeItem = computed(() => {
+  const accessToken = getAccessToken()
+  return typeof accessToken === 'string' && accessToken.trim().length > 0
 })
 
 const isLikedByMe = computed(() => {
@@ -966,6 +1001,9 @@ function onFooterClick(e: MouseEvent) {
 const onLikeButtonClick = (e: MouseEvent) => {
   e.preventDefault()
   e.stopPropagation()
+  if (!canLikeItem.value) {
+    return
+  }
   retroStore.updateItemLike(props.element.id)
 }
 

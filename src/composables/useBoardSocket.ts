@@ -93,6 +93,10 @@ export const useBoardSocket = (accessToken: string | null) => {
     if (message === UNAUTHORIZED_MESSAGE) {
       status.value = 'unauthorized'
       disconnect('unauthorized', false)
+      // Anonymous board sessions should not be redirected to auth page on WS unauthorized.
+      if (!accessToken) {
+        return
+      }
       clearAuthSession()
       retroStore.clearCurrentUser()
       void router.replace({ name: 'auth' })

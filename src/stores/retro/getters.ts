@@ -1,4 +1,15 @@
+import { getOrCreateAnonymousId } from '@/auth/anonymousIdentity'
+import { getAccessToken } from '@/auth/session'
 import type { TRetroBoardState } from './types'
+
+const getFallbackViewerId = () => {
+  const accessToken = getAccessToken()
+  if (typeof accessToken === 'string' && accessToken.trim()) {
+    return ''
+  }
+
+  return getOrCreateAnonymousId()
+}
 
 export const retroGetters = {
   getBoard: (state: TRetroBoardState) => state.board,
@@ -79,7 +90,7 @@ export const retroGetters = {
   },
   getIsBoardLoading: (state: TRetroBoardState) => state.isBoardLoading,
   getCurrentUser: (state: TRetroBoardState) => state.currentUser,
-  getCurrentUserId: (state: TRetroBoardState) => state.currentUser.id ?? '',
+  getCurrentUserId: (state: TRetroBoardState) => state.currentUser.id ?? getFallbackViewerId(),
   getCurrentUserEmail: (state: TRetroBoardState) => state.currentUser.email ?? '',
   getCurrentUserName: (state: TRetroBoardState) =>
     state.currentUser.name ?? state.currentUser.email ?? '',

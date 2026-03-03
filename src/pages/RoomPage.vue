@@ -85,6 +85,7 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
+import { AxiosError } from 'axios'
 import type { Socket } from 'socket.io-client'
 import { clearAuthSession, getAccessToken } from '@/auth/session'
 import TextEditModal from '@/components/common/TextEditModal/TextEditModal.vue'
@@ -101,10 +102,83 @@ import RetroBoardComponent from '../components/retro/RetroBoardComponent/RetroBo
 import Loader from '../components/common/Loader/Loader.vue'
 import { useRetroStore } from '../stores/RetroStore'
 
+type UnknownRecord = Record<string, unknown>
+
+const isRecord = (value: unknown): value is UnknownRecord => {
+  return typeof value === 'object' && value !== null
+}
+
+const asErrorMessage = (value: unknown): string => {
+  return typeof value === 'string' && value.trim() ? value.trim() : ''
+}
+
+const extractErrorStatus = (error: unknown): number | null => {
+  if (error instanceof AxiosError && typeof error.response?.status === 'number') {
+    return error.response.status
+  }
+
+  if (!isRecord(error)) {
+    return null
+  }
+
+  if (typeof error.status === 'number') {
+    return error.status
+  }
+
+  const response = isRecord(error.response) ? error.response : null
+  if (typeof response?.status === 'number') {
+    return response.status
+  }
+
+  return null
+}
+
+const extractErrorMessage = (error: unknown): string => {
+  if (error instanceof Error) {
+    const directMessage = asErrorMessage(error.message)
+    if (directMessage) {
+      return directMessage
+    }
+  }
+
+  if (!isRecord(error)) {
+    return ''
+  }
+
+  const directMessage = asErrorMessage(error.message)
+  if (directMessage) {
+    return directMessage
+  }
+
+  const response = isRecord(error.response) ? error.response : null
+  const data = isRecord(response?.data) ? response.data : null
+  if (Array.isArray(data?.message)) {
+    const normalizedMessages = data.message
+      .filter((entry): entry is string => typeof entry === 'string')
+      .map((entry) => entry.trim())
+      .filter(Boolean)
+    if (normalizedMessages.length > 0) {
+      return normalizedMessages.join(', ')
+    }
+  }
+
+  return asErrorMessage(data?.message)
+}
+
+const getNormalizedAccessToken = () => {
+  const rawToken = getAccessToken()
+  if (typeof rawToken !== 'string') {
+    return null
+  }
+
+  const normalizedToken = rawToken.trim()
+  return normalizedToken || null
+}
+
 const retroStore = useRetroStore()
 const route = useRoute()
 const router = useRouter()
-const accessToken = getAccessToken()
+const accessToken = getNormalizedAccessToken()
 const userName = computed(() => retroStore.getCurrentUserName || 'Пользователь')
 const boardTitle = computed(() => retroStore.getBoard[0]?.name ?? '')
 const currentBoardId = computed(() => retroStore.getBoard[0]?.id ?? null)
@@ -120,6 +194,7 @@ const { notifications, pushNotification, dismissNotification } = useUiNotificati
 let boardSocket: Socket<ServerToClientEvents, ClientToServerEvents> | null = null
 let unsubscribeRetroListeners: (() => void) | null = null
 let boardJoinRequestId = 0
+let boardLoadRequestId = 0
 
 provideBoardNotifications({
   notifications,
@@ -186,12 +261,59 @@ const resolveRouteBoardId = () => {
   return Number.isFinite(routeBoardId) && routeBoardId > 0 ? routeBoardId : null
 }
 
-const loadBoardFromRoute = (boardId: number | null) => {
-  if (!boardId) {
-    return
+const isAnonymousSession = () => {
+  return !getNormalizedAccessToken()
+}
+
+const isAnonymousAccessDeniedError = (error: unknown) => {
+  const status = extractErrorStatus(error)
+  if (status === 401 || status === 403 || status === 404) {
+    return true
   }
 
-  void retroStore.loadBoardById(boardId)
+  const normalizedMessage = extractErrorMessage(error).toLowerCase()
+  if (!normalizedMessage) {
+    return false
+  }
+
+  return (
+    normalizedMessage.includes('unauthorized') ||
+    normalizedMessage.includes('forbidden') ||
+    normalizedMessage.includes('not found') ||
+    normalizedMessage.includes('не найден') ||
+    normalizedMessage.includes('доступ запрещен')
+  )
+}
+
+const redirectAnonymousToAuth = async () => {
+  if (!isAnonymousSession()) {
+    return false
+  }
+
+  await router.replace({ name: 'auth' })
+  return true
+}
+
+const loadBoardFromRoute = async (boardId: number | null) => {
+  if (!boardId) {
+    return false
+  }
+
+  const requestId = ++boardLoadRequestId
+
+  try {
+    await retroStore.loadBoardById(boardId)
+    return requestId === boardLoadRequestId
+  } catch (error) {
+    if (requestId !== boardLoadRequestId) {
+      return false
+    }
+
+    if (isAnonymousAccessDeniedError(error)) {
+      await redirectAnonymousToAuth()
+    }
+    return false
+  }
 }
 
 const unsubscribeBoardRealtimeEvents = () => {
@@ -204,7 +326,7 @@ const subscribeBoardRealtime = async (boardId: number) => {
   realtimeSyncError.value = ''
 
   try {
-    const socket = await connectSocket(accessToken)
+    const socket = await connectSocket(getNormalizedAccessToken())
 
     if (requestId !== boardJoinRequestId) {
       return
@@ -293,27 +415,33 @@ const subscribeBoardRealtime = async (boardId: number) => {
       return
     }
 
-    realtimeSyncError.value =
-      error instanceof Error && typeof error.message === 'string' && error.message
-        ? error.message
-        : 'Не удалось подключить realtime синхронизацию'
+    if (isAnonymousAccessDeniedError(error)) {
+      const isRedirected = await redirectAnonymousToAuth()
+      if (isRedirected) {
+        return
+      }
+    }
+
+    realtimeSyncError.value = extractErrorMessage(error) || 'Не удалось подключить realtime синхронизацию'
   }
 }
 
 watch(
   () => route.params.id,
   () => {
-    const boardId = resolveRouteBoardId()
-    loadBoardFromRoute(boardId)
+    void (async () => {
+      const boardId = resolveRouteBoardId()
+      const isBoardLoaded = await loadBoardFromRoute(boardId)
 
-    if (!boardId) {
-      boardJoinRequestId += 1
-      unsubscribeBoardRealtimeEvents()
-      boardSocket = null
-      return
-    }
+      if (!boardId || !isBoardLoaded) {
+        boardJoinRequestId += 1
+        unsubscribeBoardRealtimeEvents()
+        boardSocket = null
+        return
+      }
 
-    void subscribeBoardRealtime(boardId)
+      void subscribeBoardRealtime(boardId)
+    })()
   },
   { immediate: true },
 )

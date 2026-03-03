@@ -1,5 +1,6 @@
 import { toRaw } from 'vue'
 import { httpClient } from '@/api/httpClient'
+import { getAccessToken } from '@/auth/session'
 import { retroBoardService } from '@/api/services/retroBoardService'
 import { getBoardColumns } from '../helpers/selectors'
 import { recalculateItemIndices } from '../helpers/positions'
@@ -181,6 +182,11 @@ export const itemActions = {
   },
 
   updateItemLike(this: TItemActionsContext, itemId: number, userId?: string | null) {
+    const accessToken = getAccessToken()
+    if (typeof accessToken !== 'string' || accessToken.trim().length === 0) {
+      return
+    }
+
     const currentUserId = userId ?? this.getCurrentUserId
     const location = findItemLocation(getBoardColumns(this), itemId)
     if (!location) {

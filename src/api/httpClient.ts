@@ -1,4 +1,5 @@
 import axios, { AxiosError, AxiosHeaders } from 'axios'
+import { getOrCreateAnonymousId } from '@/auth/anonymousIdentity'
 import { clearAuthSession, getAccessToken, getRefreshToken, setAuthTokens } from '@/auth/session'
 
 const RETRO_API_BASE_URL = import.meta.env.VITE_RETRO_API_BASE_URL?.trim() ?? ''
@@ -85,6 +86,8 @@ httpClient.interceptors.request.use((config) => {
     const accessToken = getAccessToken()
     if (accessToken) {
       headers.set('Authorization', `Bearer ${accessToken}`)
+    } else if (!headers.has('X-Anonymous-Id')) {
+      headers.set('X-Anonymous-Id', getOrCreateAnonymousId())
     }
   }
 
