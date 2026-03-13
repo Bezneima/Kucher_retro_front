@@ -4,9 +4,23 @@ import { getAccessToken } from '@/auth/session'
 import { renameBoard } from '@/shared/socket'
 import { normalizeColumns } from '../helpers/normalize'
 import { reorderColumnsByPayloadIds } from '../helpers/reorderColumns'
-import type { TRetroBoard, TRetroBoardState, TRetroUserBoardRole } from '../types'
+import type {
+  RetroBoardSettings,
+  TRetroBoard,
+  TRetroBoardState,
+  TRetroUserBoardRole,
+} from '../types'
 
 type TRecord = Record<string, unknown>
+const DEFAULT_BOARD_SETTINGS: RetroBoardSettings = {
+  showLikes: true,
+}
+
+const resolveInitialBoardSettings = (): RetroBoardSettings => {
+  return {
+    ...DEFAULT_BOARD_SETTINGS,
+  }
+}
 
 const normalizeUserBoardRole = (value: unknown): TRetroUserBoardRole | null => {
   return value === 'OWNER' || value === 'ADMIN' || value === 'MEMBER' ? value : null
@@ -27,6 +41,32 @@ const asPositiveNumber = (value: unknown): number | null => {
 
 const asBoolean = (value: unknown): boolean => {
   return value === true
+}
+
+const asBoardSettings = (
+  value: unknown,
+  fallback: RetroBoardSettings = DEFAULT_BOARD_SETTINGS,
+): RetroBoardSettings => {
+  if (!isRecord(value)) {
+    return { ...fallback }
+  }
+
+  return {
+    showLikes: typeof value.showLikes === 'boolean' ? value.showLikes : fallback.showLikes,
+  }
+}
+
+const clearBoardLikes = (board: TRetroBoard) => {
+  for (const column of board.columns) {
+    for (const item of column.items) {
+      item.likes = []
+    }
+    for (const group of column.groups) {
+      for (const item of group.items) {
+        item.likes = []
+      }
+    }
+  }
 }
 
 const resolveBoardPayload = (payload: unknown): TRecord | null => {
@@ -80,6 +120,66 @@ const extractOptionalIsAllCardsHiddenFromBoardPayload = (payload: unknown): bool
   }
 
   return boardPayload.isAllCardsHidden
+}
+
+const extractBoardSettingsFromBoardPayload = (
+  payload: unknown,
+  fallback: RetroBoardSettings = DEFAULT_BOARD_SETTINGS,
+): RetroBoardSettings => {
+  return extractBoardSettingsFromAnyPayload(payload, fallback)
+}
+
+const extractBoardSettingsFromAnyPayload = (
+  payload: unknown,
+  fallback: RetroBoardSettings = DEFAULT_BOARD_SETTINGS,
+): RetroBoardSettings => {
+  if (isRecord(payload)) {
+    if (isRecord(payload.settings)) {
+      return asBoardSettings(payload.settings, fallback)
+    }
+    if (typeof payload.showLikes === 'boolean') {
+      return asBoardSettings(payload, fallback)
+    }
+  }
+
+  const boardPayload = resolveBoardPayload(payload)
+  if (boardPayload) {
+    if ('settings' in boardPayload) {
+      return asBoardSettings(boardPayload.settings, fallback)
+    }
+    if ('showLikes' in boardPayload) {
+      return asBoardSettings(boardPayload, fallback)
+    }
+  }
+
+  if (isRecord(payload) && 'showLikes' in payload) {
+    return asBoardSettings(payload, fallback)
+  }
+
+  return { ...fallback }
+}
+
+const hasBoardSettingsInPayload = (payload: unknown): boolean => {
+  if (isRecord(payload)) {
+    if (isRecord(payload.settings) && typeof payload.settings.showLikes === 'boolean') {
+      return true
+    }
+    if (typeof payload.showLikes === 'boolean') {
+      return true
+    }
+  }
+
+  const boardPayload = resolveBoardPayload(payload)
+  if (boardPayload) {
+    if (isRecord(boardPayload.settings) && typeof boardPayload.settings.showLikes === 'boolean') {
+      return true
+    }
+
+    if (typeof boardPayload.showLikes === 'boolean') {
+      return true
+    }
+  }
+  return false
 }
 
 const extractColumnsPayload = (payload: unknown): unknown[] => {
@@ -163,11 +263,45 @@ const resolveCurrentUserBoardRole = async (boardPayload: unknown): Promise<TRetr
   }
 }
 
+const loadBoardMetaForBoardById = async (boardId: number): Promise<Partial<TRetroBoard> | undefined> => {
+  const hasAccessToken = Boolean(getAccessToken())
+
+  if (hasAccessToken) {
+    try {
+      const boardsResponse = await httpClient.get('/retro/boards')
+      const boardsData = Array.isArray(boardsResponse.data) ? boardsResponse.data : []
+
+      const boardFromList = boardsData.find((item) => {
+        return Number((item as Partial<TRetroBoard>)?.id) === boardId
+      }) as Partial<TRetroBoard> | undefined
+
+      if (boardFromList) {
+        return boardFromList
+      }
+    } catch (error) {
+      console.error('[retro] failed to load board list for board by id', boardId, error)
+    }
+  }
+
+  try {
+    const boardResponse = await httpClient.get(`/retro/boards/${boardId}`)
+    const boardPayload = resolveBoardPayload(boardResponse.data)
+    return boardPayload as Partial<TRetroBoard> | undefined
+  } catch (error) {
+    if (hasAccessToken) {
+      console.error('[retro] failed to load board meta by id', boardId, error)
+    }
+
+    return undefined
+  }
+}
+
 type TBoardActionsContext = TRetroBoardState & {
   loadBoardData: (boardData: Partial<TRetroBoard> | undefined) => Promise<void>
   loadBoardColumns: (boardId: number) => Promise<void>
   normalizeColumns: (columnsData: unknown) => TRetroBoard['columns']
   setLastSyncedPositions: () => void
+  setBoardSettings: (settings: RetroBoardSettings) => void
 }
 
 export const boardActions = {
@@ -195,6 +329,20 @@ export const boardActions = {
     currentBoard.isAllCardsHidden = isAllCardsHidden
     this.board = [{ ...currentBoard }]
   },
+  setBoardSettings(this: TBoardActionsContext, settings: RetroBoardSettings) {
+    const currentBoard = this.board[0]
+    if (!currentBoard) {
+      return
+    }
+
+    currentBoard.settings = {
+      ...settings,
+    }
+    if (currentBoard.settings.showLikes === false) {
+      clearBoardLikes(currentBoard)
+    }
+    this.board = [{ ...currentBoard }]
+  },
   normalizeColumns(this: TBoardActionsContext, columnsData: unknown) {
     return normalizeColumns(columnsData)
   },
@@ -220,6 +368,8 @@ export const boardActions = {
 
     this.currentUserTeamRole = await resolveCurrentUserBoardRole(boardData)
 
+    const initialBoardSettings = resolveInitialBoardSettings()
+
     const board: TRetroBoard = {
       id: boardId,
       teamId: extractTeamIdFromBoardPayload(boardData),
@@ -227,6 +377,7 @@ export const boardActions = {
       date: boardData.date ?? '',
       description: boardData.description ?? '',
       isAllCardsHidden: extractIsAllCardsHiddenFromBoardPayload(boardData),
+      settings: extractBoardSettingsFromBoardPayload(boardData, initialBoardSettings),
       columns: [],
     }
 
@@ -236,6 +387,10 @@ export const boardActions = {
     } else {
       const columnsPayload = await retroBoardService.getBoardColumns(boardId)
       board.columns = this.normalizeColumns(extractColumnsPayload(columnsPayload))
+      board.settings = extractBoardSettingsFromBoardPayload(columnsPayload, board.settings)
+    }
+    if (board.settings.showLikes === false) {
+      clearBoardLikes(board)
     }
 
     this.board = [board]
@@ -261,20 +416,9 @@ export const boardActions = {
   async loadBoardById(this: TBoardActionsContext, boardId: number) {
     this.isBoardLoading = true
     try {
+      const initialBoardSettings = resolveInitialBoardSettings()
       const columnsResponse = await retroBoardService.getBoardColumns(boardId)
-      let rawBoard: Partial<TRetroBoard> | undefined
-
-      if (getAccessToken()) {
-        try {
-          const boardsResponse = await httpClient.get('/retro/boards')
-          const boardsData = Array.isArray(boardsResponse.data) ? boardsResponse.data : []
-          rawBoard = boardsData.find(
-            (item) => Number((item as Partial<TRetroBoard>)?.id) === boardId,
-          ) as Partial<TRetroBoard> | undefined
-        } catch (error) {
-          console.error('[retro] failed to load board list for board by id', boardId, error)
-        }
-      }
+      let rawBoard: Partial<TRetroBoard> | undefined = await loadBoardMetaForBoardById(boardId)
 
       const columnsBoardPayload = resolveBoardPayload(columnsResponse)
       if (!rawBoard && columnsBoardPayload) {
@@ -290,7 +434,23 @@ export const boardActions = {
         date: typeof rawBoard?.date === 'string' ? rawBoard.date : '',
         description: typeof rawBoard?.description === 'string' ? rawBoard.description : '',
         isAllCardsHidden: extractIsAllCardsHiddenFromBoardPayload(rawBoard),
+        settings: extractBoardSettingsFromBoardPayload(rawBoard, initialBoardSettings),
         columns: this.normalizeColumns(extractColumnsPayload(columnsResponse)),
+      }
+      board.settings = extractBoardSettingsFromBoardPayload(columnsResponse, board.settings)
+      if (!hasBoardSettingsInPayload(rawBoard) && !hasBoardSettingsInPayload(columnsResponse)) {
+        try {
+          const settingsPayload = await retroBoardService.getBoardSettings(boardId)
+          board.settings = extractBoardSettingsFromAnyPayload(settingsPayload, board.settings)
+        } catch (error) {
+          if (getAccessToken()) {
+            console.error('[retro] failed to load board settings by id', boardId, error)
+          }
+        }
+      }
+
+      if (board.settings.showLikes === false) {
+        clearBoardLikes(board)
       }
 
       this.board = [board]
@@ -325,6 +485,10 @@ export const boardActions = {
       const nextIsAllCardsHidden = extractOptionalIsAllCardsHiddenFromBoardPayload(columnsPayload)
       if (nextIsAllCardsHidden != null) {
         currentBoard.isAllCardsHidden = nextIsAllCardsHidden
+      }
+      currentBoard.settings = extractBoardSettingsFromBoardPayload(columnsPayload, currentBoard.settings)
+      if (currentBoard.settings.showLikes === false) {
+        clearBoardLikes(currentBoard)
       }
       this.board = [{ ...currentBoard }]
       this.setLastSyncedPositions()
@@ -394,5 +558,33 @@ export const boardActions = {
     } catch (error) {
       console.error('[retro] failed to apply realtime columns reorder', error)
     }
+  },
+  applyBoardSettingsFromPayload(this: TBoardActionsContext, payload: unknown) {
+    const boardPayload = resolveBoardPayload(payload)
+    if (!boardPayload) {
+      return
+    }
+
+    const boardId = asPositiveNumber(boardPayload.id ?? boardPayload.boardId)
+    const currentBoard = this.board[0]
+    if (!boardId || !currentBoard || currentBoard.id !== boardId) {
+      return
+    }
+
+    const nextSettings = extractBoardSettingsFromBoardPayload(payload, currentBoard.settings)
+    this.setBoardSettings(nextSettings)
+  },
+  applyBoardSettingsUpdatedFromSocket(
+    this: TBoardActionsContext,
+    payload: { boardId?: unknown; settings?: unknown },
+  ) {
+    const boardId = asPositiveNumber(payload.boardId)
+    const currentBoard = this.board[0]
+    if (!boardId || !currentBoard || currentBoard.id !== boardId) {
+      return
+    }
+
+    const nextSettings = asBoardSettings(payload.settings, currentBoard.settings)
+    this.setBoardSettings(nextSettings)
   },
 }

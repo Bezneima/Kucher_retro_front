@@ -182,6 +182,11 @@ export const itemActions = {
   },
 
   updateItemLike(this: TItemActionsContext, itemId: number, userId?: string | null) {
+    const isLikesVisible = this.board[0]?.settings?.showLikes ?? true
+    if (!isLikesVisible) {
+      return
+    }
+
     const accessToken = getAccessToken()
     if (typeof accessToken !== 'string' || accessToken.trim().length === 0) {
       return

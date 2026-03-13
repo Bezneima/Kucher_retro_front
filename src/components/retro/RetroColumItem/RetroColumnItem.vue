@@ -52,6 +52,7 @@
 
         <div class="card-footer-actions">
           <div
+            v-if="isBoardLikesVisible"
             :class="[
               'card-footer-like-container',
               { 'card-footer-like-container-disabled': !canLikeItem },
@@ -782,7 +783,13 @@ const canCreateComment = computed(() => {
   return newCommentText.value.trim().length > 0
 })
 
+const isBoardLikesVisible = computed(() => retroStore.getIsBoardLikesVisible)
+
 const canLikeItem = computed(() => {
+  if (!isBoardLikesVisible.value) {
+    return false
+  }
+
   const accessToken = getAccessToken()
   return typeof accessToken === 'string' && accessToken.trim().length > 0
 })

@@ -100,8 +100,15 @@ httpClient.interceptors.response.use(
   (error: AxiosError) => {
     const status = error.response?.status
     const requestConfig = error.config as (typeof error.config & RetriableRequestConfig) | undefined
+    const hasAuthSession = Boolean(getAccessToken() || getRefreshToken())
 
-    if (status === 401 && requestConfig && !requestConfig._retry && !shouldSkipRefresh(requestConfig.url)) {
+    if (
+      status === 401 &&
+      hasAuthSession &&
+      requestConfig &&
+      !requestConfig._retry &&
+      !shouldSkipRefresh(requestConfig.url)
+    ) {
       requestConfig._retry = true
 
       return refreshAccessToken()
@@ -117,7 +124,7 @@ httpClient.interceptors.response.use(
           return httpClient(requestConfig)
         })
         .catch((refreshError) => {
-          if (typeof window !== 'undefined' && window.location.pathname !== '/auth') {
+          if (typeof window !== 'undefined' && window.location.pathname !== '/auth' && hasAuthSession) {
             clearAuthSession()
             window.location.assign('/auth')
           }

@@ -59,7 +59,7 @@
       <BoardTimerControl :board-id="currentBoardId" />
 
       <div v-if="canManageBoard" class="board-team-actions">
-        <TeamBoardSettingsControl :team-id="currentTeamId" />
+        <TeamBoardSettingsControl :team-id="currentTeamId" :board-id="currentBoardId" />
         <BoardShareControl />
       </div>
     </div>

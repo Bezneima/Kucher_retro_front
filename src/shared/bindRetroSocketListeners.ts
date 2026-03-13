@@ -1,6 +1,7 @@
 import type { Socket } from 'socket.io-client'
 import {
   WS_SERVER_EVENT_NAMES,
+  type BoardSettingsUpdatedPayload,
   type BoardColumnsReorderedEventPayload,
   type ClientToServerEvents,
   type ServerToClientEvents,
@@ -40,6 +41,7 @@ export type RetroSocketHandlers = {
   onItemCommentCreated: (payload: WsComment) => void
   onItemCommentUpdated: (payload: WsComment) => void
   onItemCommentDeleted: (payload: WsItemCommentDeletedPayload) => void
+  onBoardSettingsUpdated: (payload: BoardSettingsUpdatedPayload) => void
   onTeamAllCardsVisibilityUpdated: (payload: TeamAllCardsVisibilityUpdatedPayload) => void
 }
 
@@ -74,6 +76,7 @@ export const bindRetroSocketListeners = (
   socket.on(WS_SERVER_EVENT_NAMES.ITEM_COMMENT_CREATED, handlers.onItemCommentCreated)
   socket.on(WS_SERVER_EVENT_NAMES.ITEM_COMMENT_UPDATED, handlers.onItemCommentUpdated)
   socket.on(WS_SERVER_EVENT_NAMES.ITEM_COMMENT_DELETED, handlers.onItemCommentDeleted)
+  socket.on(WS_SERVER_EVENT_NAMES.BOARD_SETTINGS_UPDATED, handlers.onBoardSettingsUpdated)
   socket.on(
     WS_SERVER_EVENT_NAMES.TEAM_ALL_CARDS_VISIBILITY_UPDATED,
     handlers.onTeamAllCardsVisibilityUpdated,
@@ -116,6 +119,7 @@ export const bindRetroSocketListeners = (
     socket.off(WS_SERVER_EVENT_NAMES.ITEM_COMMENT_CREATED, handlers.onItemCommentCreated)
     socket.off(WS_SERVER_EVENT_NAMES.ITEM_COMMENT_UPDATED, handlers.onItemCommentUpdated)
     socket.off(WS_SERVER_EVENT_NAMES.ITEM_COMMENT_DELETED, handlers.onItemCommentDeleted)
+    socket.off(WS_SERVER_EVENT_NAMES.BOARD_SETTINGS_UPDATED, handlers.onBoardSettingsUpdated)
     socket.off(
       WS_SERVER_EVENT_NAMES.TEAM_ALL_CARDS_VISIBILITY_UPDATED,
       handlers.onTeamAllCardsVisibilityUpdated,

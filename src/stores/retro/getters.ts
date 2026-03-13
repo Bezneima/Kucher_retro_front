@@ -11,6 +11,10 @@ const getFallbackViewerId = () => {
   return getOrCreateAnonymousId()
 }
 
+const getDefaultLikesVisibility = () => {
+  return true
+}
+
 export const retroGetters = {
   getBoard: (state: TRetroBoardState) => state.board,
   getBoardColumns: (state: TRetroBoardState) => state.board[0]?.columns ?? [],
@@ -18,6 +22,10 @@ export const retroGetters = {
   getColumnsReorderError: (state: TRetroBoardState) => state.columnsReorderError,
   getCurrentBoardTeamId: (state: TRetroBoardState) => state.board[0]?.teamId ?? null,
   getIsAllCardsHidden: (state: TRetroBoardState) => state.board[0]?.isAllCardsHidden ?? false,
+  getCurrentBoardSettings: (state: TRetroBoardState) =>
+    state.board[0]?.settings ?? { showLikes: getDefaultLikesVisibility() },
+  getIsBoardLikesVisible: (state: TRetroBoardState) =>
+    state.board[0]?.settings?.showLikes ?? getDefaultLikesVisibility(),
   getCardUiState:
     (state: TRetroBoardState) => (_itemId: number, isEditing: boolean, draftText: string) => {
       const isHidden = state.board[0]?.isAllCardsHidden ?? false

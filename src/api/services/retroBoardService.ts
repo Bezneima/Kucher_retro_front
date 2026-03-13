@@ -60,6 +60,11 @@ const ensureSyncPositionsResult = (payload: unknown): SyncPositionsResult => {
 }
 
 export const retroBoardService = {
+  async getBoardSettings(boardId: number): Promise<unknown> {
+    const response = await httpClient.get(`/retro/boards/${boardId}/settings`)
+    return response.data
+  },
+
   async getBoardColumns(boardId: number): Promise<unknown> {
     const response = await httpClient.get(`/retro/boards/${boardId}/columns`)
     return response.data
@@ -136,6 +141,14 @@ export const retroBoardService = {
       return ensureSyncPositionsResult(response.data)
     } catch (error) {
       throw getApiErrorMessage(error, 'Не удалось синхронизировать позиции карточек')
+    }
+  },
+  async updateBoardSettings(boardId: number, payload: { showLikes: boolean }) {
+    try {
+      const response = await httpClient.patch(`/retro/boards/${boardId}/settings`, payload)
+      return response.data
+    } catch (error) {
+      throw getApiErrorMessage(error, 'Не удалось обновить настройки доски')
     }
   },
 }

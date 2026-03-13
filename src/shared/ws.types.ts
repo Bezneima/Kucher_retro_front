@@ -177,6 +177,13 @@ export type TeamAllCardsVisibilityUpdatedPayload = {
   updatedAt: string
 }
 
+export type BoardSettingsUpdatedPayload = {
+  boardId: number
+  settings: {
+    showLikes: boolean
+  }
+}
+
 export const WS_DOMAIN_EVENT_NAMES = {
   BOARD_UPDATED: 'board.updated',
   COLUMN_UPDATED: 'column.updated',
@@ -217,6 +224,7 @@ export const WS_SERVER_EVENT_NAMES = {
   ITEM_COMMENT_CREATED: 'retro.item.comment.created',
   ITEM_COMMENT_UPDATED: 'retro.item.comment.updated',
   ITEM_COMMENT_DELETED: 'retro.item.comment.deleted',
+  BOARD_SETTINGS_UPDATED: 'retro.board.settings.updated',
   TEAM_ALL_CARDS_VISIBILITY_UPDATED: 'team.all-cards-visibility.updated',
 } as const
 
@@ -249,6 +257,7 @@ export interface ServerToClientEvents {
   [WS_SERVER_EVENT_NAMES.ITEM_COMMENT_CREATED]: (payload: WsComment) => void
   [WS_SERVER_EVENT_NAMES.ITEM_COMMENT_UPDATED]: (payload: WsComment) => void
   [WS_SERVER_EVENT_NAMES.ITEM_COMMENT_DELETED]: (payload: WsItemCommentDeletedPayload) => void
+  [WS_SERVER_EVENT_NAMES.BOARD_SETTINGS_UPDATED]: (payload: BoardSettingsUpdatedPayload) => void
   [WS_SERVER_EVENT_NAMES.TEAM_ALL_CARDS_VISIBILITY_UPDATED]: (
     payload: TeamAllCardsVisibilityUpdatedPayload,
   ) => void

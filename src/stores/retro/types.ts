@@ -58,6 +58,10 @@ export type RetroColumn = {
   isDraft?: boolean
 }
 
+export type RetroBoardSettings = {
+  showLikes: boolean
+}
+
 export type SyncPositionsResult = {
   boardId: number
   updated: number
@@ -78,6 +82,7 @@ export type TRetroBoard = {
   date: string
   description: string
   isAllCardsHidden: boolean
+  settings: RetroBoardSettings
   columns: TRetroColumn[]
 }
 

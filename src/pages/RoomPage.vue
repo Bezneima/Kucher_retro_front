@@ -404,6 +404,9 @@ const subscribeBoardRealtime = async (boardId: number) => {
       onItemCommentDeleted: (payload) => {
         retroStore.applyRealtimeItemCommentDeleted(payload)
       },
+      onBoardSettingsUpdated: (payload) => {
+        retroStore.applyBoardSettingsUpdatedFromSocket(payload)
+      },
       onTeamAllCardsVisibilityUpdated: (payload) => {
         retroStore.applyRealtimeTeamAllCardsVisibilityUpdated(payload)
       },

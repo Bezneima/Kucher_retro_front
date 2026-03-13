@@ -20,7 +20,7 @@
       <button
         class="board-team-settings-modal-close"
         type="button"
-        :disabled="isTeamSettingsSaving"
+        :disabled="isTeamSettingsSaving || isBoardLikesSaving"
         @click="closeTeamSettingsModal"
       >
         ×
@@ -42,11 +42,30 @@
         </label>
       </div>
 
+      <div class="board-team-settings-field">
+        <div class="board-team-settings-field-content">
+          <p class="board-team-settings-field-title">Лайки карточек</p>
+          <p class="board-team-settings-field-description">
+            Управление отображением и доступностью лайков на доске.
+          </p>
+        </div>
+
+        <button
+          type="button"
+          class="board-team-settings-like-toggle"
+          :disabled="isBoardLikesToggleDisabled"
+          @click="onBoardLikesToggleClick"
+        >
+          <SvgIcon :name="boardLikesButtonIcon" class="board-team-settings-like-toggle__icon" />
+          <span>{{ boardLikesButtonLabel }}</span>
+        </button>
+      </div>
+
       <div class="board-team-settings-actions">
         <button
           type="button"
           class="board-team-settings-button"
-          :disabled="isTeamSettingsSaving"
+          :disabled="isTeamSettingsSaving || isBoardLikesSaving"
           @click="closeTeamSettingsModal"
         >
           Cancel
@@ -54,7 +73,7 @@
         <button
           type="button"
           class="board-team-settings-button board-team-settings-button--primary"
-          :disabled="isTeamSettingsToggleDisabled"
+          :disabled="isTeamSettingsToggleDisabled || isBoardLikesSaving"
           @click="submitTeamSettingsModal"
         >
           {{ isTeamSettingsSaving ? 'Saving...' : 'Save' }}
@@ -67,25 +86,51 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
 import SvgIcon from '@/components/common/SvgIcon/SvgIcon.vue'
+import { retroBoardService, type RetroBoardApiError } from '@/api/services/retroBoardService'
 import { useBoardNotifications } from '@/composables/useBoardNotifications'
 import { teamsApiClient, toTeamBoardsApiError } from '@/features/teams/api/teamBoardsClient'
 import type { TeamSummary } from '@/features/teams/types'
+import { useRetroStore } from '@/stores/RetroStore'
 
 const props = defineProps<{
   teamId: number | null
+  boardId: number | null
 }>()
 
+const retroStore = useRetroStore()
 const currentTeamSettings = ref<TeamSummary | null>(null)
 const isTeamSettingsLoading = ref(false)
 const isTeamSettingsSaving = ref(false)
 const isTeamSettingsModalOpen = ref(false)
 const teamSettingsAnonymousAccessDraft = ref(false)
 const isTeamSettingsOverlayPointerDown = ref(false)
+const isBoardLikesSaving = ref(false)
+const isBoardLikesLocked = ref(false)
 const { pushNotification } = useBoardNotifications()
 let teamSettingsRequestId = 0
 
+const currentShowLikes = computed(() => retroStore.getIsBoardLikesVisible)
+
+const boardLikesButtonLabel = computed(() => {
+  return currentShowLikes.value ? 'Выключить лайки' : 'Включить лайки'
+})
+
+const boardLikesButtonIcon = computed(() => {
+  return currentShowLikes.value ? 'filledLike' : 'like'
+})
+
 const isTeamSettingsToggleDisabled = computed(() => {
   return isTeamSettingsLoading.value || isTeamSettingsSaving.value || !props.teamId
+})
+
+const isBoardLikesToggleDisabled = computed(() => {
+  return (
+    isBoardLikesSaving.value ||
+    isTeamSettingsSaving.value ||
+    isTeamSettingsLoading.value ||
+    isBoardLikesLocked.value ||
+    !props.boardId
+  )
 })
 
 const resetLocalState = () => {
@@ -93,6 +138,7 @@ const resetLocalState = () => {
   isTeamSettingsModalOpen.value = false
   isTeamSettingsOverlayPointerDown.value = false
   teamSettingsAnonymousAccessDraft.value = false
+  isBoardLikesLocked.value = false
 }
 
 const loadCurrentTeamSettings = async (teamId: number, notifyOnError = false) => {
@@ -126,7 +172,7 @@ const loadCurrentTeamSettings = async (teamId: number, notifyOnError = false) =>
 }
 
 const openTeamSettingsModal = async () => {
-  if (isTeamSettingsSaving.value || !props.teamId) {
+  if (isTeamSettingsSaving.value || isBoardLikesSaving.value || !props.teamId) {
     return
   }
 
@@ -142,7 +188,7 @@ const openTeamSettingsModal = async () => {
 }
 
 const closeTeamSettingsModal = () => {
-  if (isTeamSettingsSaving.value) {
+  if (isTeamSettingsSaving.value || isBoardLikesSaving.value) {
     return
   }
 
@@ -159,7 +205,8 @@ const onTeamSettingsOverlayPointerUp = (event: PointerEvent) => {
   const shouldClose =
     isTeamSettingsOverlayPointerDown.value &&
     event.target === event.currentTarget &&
-    !isTeamSettingsSaving.value
+    !isTeamSettingsSaving.value &&
+    !isBoardLikesSaving.value
   isTeamSettingsOverlayPointerDown.value = false
 
   if (!shouldClose) {
@@ -170,7 +217,13 @@ const onTeamSettingsOverlayPointerUp = (event: PointerEvent) => {
 }
 
 const submitTeamSettingsModal = async () => {
-  if (isTeamSettingsSaving.value || isTeamSettingsLoading.value || !props.teamId || !currentTeamSettings.value) {
+  if (
+    isTeamSettingsSaving.value ||
+    isBoardLikesSaving.value ||
+    isTeamSettingsLoading.value ||
+    !props.teamId ||
+    !currentTeamSettings.value
+  ) {
     return
   }
 
@@ -204,6 +257,49 @@ const submitTeamSettingsModal = async () => {
   }
 }
 
+const toBoardApiError = (error: unknown): RetroBoardApiError => {
+  if (
+    typeof error === 'object' &&
+    error !== null &&
+    typeof (error as RetroBoardApiError).message === 'string'
+  ) {
+    return error as RetroBoardApiError
+  }
+
+  return {
+    message: 'Не удалось обновить настройки доски',
+  }
+}
+
+const onBoardLikesToggleClick = async () => {
+  if (isBoardLikesToggleDisabled.value || !props.boardId) {
+    return
+  }
+
+  const nextShowLikes = !currentShowLikes.value
+  isBoardLikesSaving.value = true
+
+  try {
+    const response = await retroBoardService.updateBoardSettings(props.boardId, {
+      showLikes: nextShowLikes,
+    })
+
+    retroStore.applyBoardSettingsFromPayload(response)
+    pushNotification('success', nextShowLikes ? 'Лайки включены' : 'Лайки выключены')
+  } catch (error) {
+    const apiError = toBoardApiError(error)
+    if (apiError.status === 403) {
+      isBoardLikesLocked.value = true
+      pushNotification('error', 'Недостаточно прав', 'Изменение режима лайков недоступно для вашей роли')
+      return
+    }
+
+    pushNotification('error', 'Ошибка API', apiError.message)
+  } finally {
+    isBoardLikesSaving.value = false
+  }
+}
+
 watch(
   () => props.teamId,
   (teamId) => {
@@ -215,6 +311,13 @@ watch(
     void loadCurrentTeamSettings(teamId)
   },
   { immediate: true },
+)
+
+watch(
+  () => props.boardId,
+  () => {
+    isBoardLikesLocked.value = false
+  },
 )
 </script>
 
@@ -374,6 +477,31 @@ watch(
 
 .board-team-settings-switch input:disabled + .board-team-settings-switch__slider {
   opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.board-team-settings-like-toggle {
+  border: 1px solid #ccdaef;
+  border-radius: 8px;
+  padding: 8px 12px;
+  background: #fff;
+  color: #1f2f49;
+  font-weight: 500;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  white-space: nowrap;
+}
+
+.board-team-settings-like-toggle__icon {
+  width: 14px;
+  height: 14px;
+  color: currentColor;
+}
+
+.board-team-settings-like-toggle:disabled {
+  opacity: 0.7;
   cursor: not-allowed;
 }
 

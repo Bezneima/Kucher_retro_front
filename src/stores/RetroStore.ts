@@ -10,6 +10,7 @@ export type {
   RetroGroup,
   RetroColumnEntry,
   RetroColumn,
+  RetroBoardSettings,
   SyncPositionsResult,
   TRetroColumnItem,
   TRetroColumnColor,
