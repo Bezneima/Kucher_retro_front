@@ -27,6 +27,7 @@ export const retroGetters = {
   getBoard: (state: TRetroBoardState) => state.board,
   getBoardColumns: (state: TRetroBoardState) => state.board[0]?.columns ?? [],
   getCurrentBoardId: (state: TRetroBoardState) => state.board[0]?.id ?? null,
+  getBoardLoadingSkeletonCount: (state: TRetroBoardState) => state.boardLoadingSkeletonCount,
   getIsColumnsReorderPending: (state: TRetroBoardState) => state.isColumnsReorderPending,
   getColumnsReorderError: (state: TRetroBoardState) => state.columnsReorderError,
   getCurrentBoardTeamId: (state: TRetroBoardState) => state.board[0]?.teamId ?? null,

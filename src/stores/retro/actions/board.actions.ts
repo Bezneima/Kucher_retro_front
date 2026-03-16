@@ -17,11 +17,34 @@ const DEFAULT_BOARD_SETTINGS: RetroBoardSettings = {
   showComments: true,
   canEditCards: true,
 }
+const DEFAULT_BOARD_LOADING_SKELETON_COUNT = 3
+const MIN_BOARD_LOADING_SKELETON_MS = 250
 
 const resolveInitialBoardSettings = (): RetroBoardSettings => {
   return {
     ...DEFAULT_BOARD_SETTINGS,
   }
+}
+
+const resolveBoardLoadingSkeletonCount = (
+  state: Pick<TRetroBoardState, 'board'>,
+  fallback = DEFAULT_BOARD_LOADING_SKELETON_COUNT,
+) => {
+  const currentColumnsCount = state.board[0]?.columns?.length ?? 0
+  return currentColumnsCount > 0 ? currentColumnsCount : fallback
+}
+
+const ensureMinimumLoadingDuration = async (loadingStartedAt: number) => {
+  const elapsedMs = Date.now() - loadingStartedAt
+  const remainingMs = MIN_BOARD_LOADING_SKELETON_MS - elapsedMs
+
+  if (remainingMs <= 0) {
+    return
+  }
+
+  await new Promise((resolve) => {
+    setTimeout(resolve, remainingMs)
+  })
 }
 
 const normalizeUserBoardRole = (value: unknown): TRetroUserBoardRole | null => {
@@ -55,8 +78,10 @@ const asBoardSettings = (
 
   return {
     showLikes: typeof value.showLikes === 'boolean' ? value.showLikes : fallback.showLikes,
-    showComments: typeof value.showComments === 'boolean' ? value.showComments : fallback.showComments,
-    canEditCards: typeof value.canEditCards === 'boolean' ? value.canEditCards : fallback.canEditCards,
+    showComments:
+      typeof value.showComments === 'boolean' ? value.showComments : fallback.showComments,
+    canEditCards:
+      typeof value.canEditCards === 'boolean' ? value.canEditCards : fallback.canEditCards,
   }
 }
 
@@ -73,7 +98,9 @@ const clearBoardLikes = (board: TRetroBoard) => {
   }
 }
 
-const clearBoardCommentsCache = (state: Pick<TRetroBoardState, 'commentsByItemId' | 'commentItemIdByCommentId'>) => {
+const clearBoardCommentsCache = (
+  state: Pick<TRetroBoardState, 'commentsByItemId' | 'commentItemIdByCommentId'>,
+) => {
   state.commentsByItemId = {}
   state.commentItemIdByCommentId = {}
 }
@@ -99,7 +126,10 @@ const extractTeamRoleFromBoardPayload = (payload: unknown): TRetroUserBoardRole 
   const teamPayload = isRecord(boardPayload.team) ? boardPayload.team : undefined
 
   return normalizeUserBoardRole(
-    boardPayload.role ?? boardPayload.membershipRole ?? teamPayload?.role ?? teamPayload?.membershipRole,
+    boardPayload.role ??
+      boardPayload.membershipRole ??
+      teamPayload?.role ??
+      teamPayload?.membershipRole,
   )
 }
 
@@ -160,12 +190,19 @@ const extractBoardSettingsFromAnyPayload = (
     if ('settings' in boardPayload) {
       return asBoardSettings(boardPayload.settings, fallback)
     }
-    if ('showLikes' in boardPayload || 'showComments' in boardPayload || 'canEditCards' in boardPayload) {
+    if (
+      'showLikes' in boardPayload ||
+      'showComments' in boardPayload ||
+      'canEditCards' in boardPayload
+    ) {
       return asBoardSettings(boardPayload, fallback)
     }
   }
 
-  if (isRecord(payload) && ('showLikes' in payload || 'showComments' in payload || 'canEditCards' in payload)) {
+  if (
+    isRecord(payload) &&
+    ('showLikes' in payload || 'showComments' in payload || 'canEditCards' in payload)
+  ) {
     return asBoardSettings(payload, fallback)
   }
 
@@ -176,11 +213,9 @@ const hasBoardSettingsInPayload = (payload: unknown): boolean => {
   if (isRecord(payload)) {
     if (
       isRecord(payload.settings) &&
-      (
-        typeof payload.settings.showLikes === 'boolean' ||
+      (typeof payload.settings.showLikes === 'boolean' ||
         typeof payload.settings.showComments === 'boolean' ||
-        typeof payload.settings.canEditCards === 'boolean'
-      )
+        typeof payload.settings.canEditCards === 'boolean')
     ) {
       return true
     }
@@ -273,7 +308,9 @@ const resolveTeamRoleFromTeamsPayload = (
   return null
 }
 
-const resolveCurrentUserBoardRole = async (boardPayload: unknown): Promise<TRetroUserBoardRole | null> => {
+const resolveCurrentUserBoardRole = async (
+  boardPayload: unknown,
+): Promise<TRetroUserBoardRole | null> => {
   const roleFromBoard = extractTeamRoleFromBoardPayload(boardPayload)
   if (roleFromBoard) {
     return roleFromBoard
@@ -296,7 +333,9 @@ const resolveCurrentUserBoardRole = async (boardPayload: unknown): Promise<TRetr
   }
 }
 
-const loadBoardMetaForBoardById = async (boardId: number): Promise<Partial<TRetroBoard> | undefined> => {
+const loadBoardMetaForBoardById = async (
+  boardId: number,
+): Promise<Partial<TRetroBoard> | undefined> => {
   const hasAccessToken = Boolean(getAccessToken())
 
   if (hasAccessToken) {
@@ -432,6 +471,8 @@ export const boardActions = {
     this.setLastSyncedPositions()
   },
   async loadBoardForUser(this: TBoardActionsContext) {
+    const loadingStartedAt = Date.now()
+    this.boardLoadingSkeletonCount = resolveBoardLoadingSkeletonCount(this)
     this.isBoardLoading = true
     try {
       const boardsResponse = await httpClient.get('/retro/boards')
@@ -443,10 +484,13 @@ export const boardActions = {
     } catch (error) {
       console.error('[retro] failed to load board for user', error)
     } finally {
+      await ensureMinimumLoadingDuration(loadingStartedAt)
       this.isBoardLoading = false
     }
   },
   async loadBoardById(this: TBoardActionsContext, boardId: number) {
+    const loadingStartedAt = Date.now()
+    this.boardLoadingSkeletonCount = resolveBoardLoadingSkeletonCount(this)
     this.isBoardLoading = true
     try {
       const initialBoardSettings = resolveInitialBoardSettings()
@@ -497,6 +541,7 @@ export const boardActions = {
       this.lastSyncedPositions = {}
       throw error
     } finally {
+      await ensureMinimumLoadingDuration(loadingStartedAt)
       this.isBoardLoading = false
     }
   },
@@ -517,7 +562,10 @@ export const boardActions = {
       if (nextIsAllCardsHidden != null) {
         currentBoard.isAllCardsHidden = nextIsAllCardsHidden
       }
-      currentBoard.settings = extractBoardSettingsFromBoardPayload(columnsPayload, currentBoard.settings)
+      currentBoard.settings = extractBoardSettingsFromBoardPayload(
+        columnsPayload,
+        currentBoard.settings,
+      )
       if (currentBoard.settings.showLikes === false) {
         clearBoardLikes(currentBoard)
       }
@@ -563,7 +611,9 @@ export const boardActions = {
 
     const boardId = asPositiveNumber(boardPayload.id)
     const boardName =
-      typeof boardPayload.name === 'string' && boardPayload.name.trim() ? boardPayload.name.trim() : ''
+      typeof boardPayload.name === 'string' && boardPayload.name.trim()
+        ? boardPayload.name.trim()
+        : ''
     if (!boardId || !boardName) {
       return
     }

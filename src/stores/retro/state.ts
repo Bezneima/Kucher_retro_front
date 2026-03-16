@@ -2,6 +2,7 @@ import type { TRetroBoardState } from './types'
 
 export const createRetroState = (): TRetroBoardState => ({
   isBoardLoading: false,
+  boardLoadingSkeletonCount: 3,
   isColumnsReorderPending: false,
   columnsReorderError: '',
   activeItemId: null,

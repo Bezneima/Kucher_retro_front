@@ -123,6 +123,7 @@ export type TGroupPositionPayloadChange = {
 export type TRetroBoardState = {
   board: TRetroBoard[]
   isBoardLoading: boolean
+  boardLoadingSkeletonCount: number
   isColumnsReorderPending: boolean
   columnsReorderError: string
   activeItemId: number | null

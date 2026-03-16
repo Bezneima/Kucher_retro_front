@@ -19,7 +19,10 @@
 
     <section class="room-content">
       <div class="columns">
-        <Loader v-if="retroStore.getIsBoardLoading" />
+        <RetroBoardSkeleton
+          v-if="retroStore.getIsBoardLoading"
+          :count="retroStore.getBoardLoadingSkeletonCount"
+        />
         <RetroBoardComponent v-else />
       </div>
     </section>
@@ -99,7 +102,7 @@ import type { ClientToServerEvents, ServerToClientEvents } from '@/shared/ws.typ
 import { provideBoardNotifications } from '@/composables/useBoardNotifications'
 import { useUiNotifications } from '@/composables/useUiNotifications'
 import RetroBoardComponent from '../components/retro/RetroBoardComponent/RetroBoardComponent.vue'
-import Loader from '../components/common/Loader/Loader.vue'
+import RetroBoardSkeleton from '../components/retro/RetroBoardComponent/RetroBoardSkeleton.vue'
 import { useRetroStore } from '../stores/RetroStore'
 
 type UnknownRecord = Record<string, unknown>
