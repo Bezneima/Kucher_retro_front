@@ -1,6 +1,8 @@
 <template>
   <div
-    class="column"
+    :class="['column', { 'column--common': column.common }]"
+    :data-column-id="column.id"
+    :data-column-common="column.common ? 'true' : 'false'"
     :style="{
       '--column-bg': column.color.columnColor,
       '--item-bg': column.color.itemColor,
@@ -10,11 +12,15 @@
     <div class="column-top">
       <div class="column-header">
         <span
-          class="column-drag-handle"
-          title="Перетащите для изменения порядка колонки"
+          :class="['column-drag-handle', { 'column-drag-handle-disabled': column.common }]"
+          :title="
+            column.common
+              ? 'Общие колонки нельзя перемещать'
+              : 'Перетащите для изменения порядка колонки'
+          "
           @click.stop
         >
-          <SvgIcon name="moveColumn" class="column-drag-handle__icon" />
+          <SvgIcon v-if="!column.common" name="moveColumn" class="column-drag-handle__icon" />
         </span>
 
         <span
@@ -34,6 +40,7 @@
             @click="onEditColumnClick"
             >{{ column.name }}</span
           >
+
           <button
             class="column-header__title-edit"
             type="button"
@@ -514,6 +521,11 @@ const onCreateGroupClick = async () => {
   padding: 16px;
 }
 
+.column--common {
+  border: 4px dashed color-mix(in srgb, var(--column-bg) 90%, black);
+  padding: 12px;
+}
+
 .column-top {
   display: flex;
   flex-direction: column;
@@ -529,6 +541,18 @@ const onCreateGroupClick = async () => {
   align-items: center;
   gap: 6px;
   padding-right: 6px;
+}
+
+.column-header__badge {
+  display: inline-flex;
+  align-items: center;
+  border-radius: 9999px;
+  background: rgb(255 255 255 / 65%);
+  padding: 2px 8px;
+  color: #476286;
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1.2;
 }
 
 .column-header {
@@ -565,7 +589,9 @@ const onCreateGroupClick = async () => {
   opacity: 0;
   visibility: hidden;
   pointer-events: none;
-  transition: opacity 0.16s ease, color 0.16s ease;
+  transition:
+    opacity 0.16s ease,
+    color 0.16s ease;
 }
 
 .column-header__title-edit-zone:hover .column-header__title-edit,
@@ -603,6 +629,15 @@ const onCreateGroupClick = async () => {
 
 .column-drag-handle:hover {
   background-color: color-mix(in srgb, var(--column-bg) 80%, black);
+}
+
+.column-drag-handle-disabled {
+  cursor: default;
+  opacity: 0.45;
+}
+
+.column-drag-handle-disabled:hover {
+  background-color: transparent;
 }
 
 .column-drag-handle__icon {

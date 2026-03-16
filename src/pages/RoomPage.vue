@@ -83,7 +83,7 @@
 </style>
 
 <script setup lang="ts">
-import { computed, onBeforeUnmount, ref, watch } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { AxiosError } from 'axios'
 import type { Socket } from 'socket.io-client'
@@ -195,6 +195,7 @@ let boardSocket: Socket<ServerToClientEvents, ClientToServerEvents> | null = nul
 let unsubscribeRetroListeners: (() => void) | null = null
 let boardJoinRequestId = 0
 let boardLoadRequestId = 0
+let lastForegroundBoardSyncAt = 0
 
 provideBoardNotifications({
   notifications,
@@ -313,6 +314,31 @@ const loadBoardFromRoute = async (boardId: number | null) => {
       await redirectAnonymousToAuth()
     }
     return false
+  }
+}
+
+const syncBoardOnForeground = () => {
+  const boardId = resolveRouteBoardId()
+  if (!boardId || retroStore.getIsBoardLoading) {
+    return
+  }
+
+  const now = Date.now()
+  if (now - lastForegroundBoardSyncAt < 500) {
+    return
+  }
+  lastForegroundBoardSyncAt = now
+
+  void loadBoardFromRoute(boardId)
+}
+
+const onWindowFocus = () => {
+  syncBoardOnForeground()
+}
+
+const onDocumentVisibilityChange = () => {
+  if (document.visibilityState === 'visible') {
+    syncBoardOnForeground()
   }
 }
 
@@ -449,9 +475,27 @@ watch(
   { immediate: true },
 )
 
+onMounted(() => {
+  if (typeof window !== 'undefined') {
+    window.addEventListener('focus', onWindowFocus)
+  }
+
+  if (typeof document !== 'undefined') {
+    document.addEventListener('visibilitychange', onDocumentVisibilityChange)
+  }
+})
+
 onBeforeUnmount(() => {
   boardJoinRequestId += 1
   unsubscribeBoardRealtimeEvents()
   boardSocket = null
+
+  if (typeof window !== 'undefined') {
+    window.removeEventListener('focus', onWindowFocus)
+  }
+
+  if (typeof document !== 'undefined') {
+    document.removeEventListener('visibilitychange', onDocumentVisibilityChange)
+  }
 })
 </script>

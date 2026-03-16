@@ -1,8 +1,7 @@
 import { toRaw } from 'vue'
-import { httpClient } from '@/api/httpClient'
 import { getAccessToken } from '@/auth/session'
 import { retroBoardService } from '@/api/services/retroBoardService'
-import { getBoardColumns } from '../helpers/selectors'
+import { getBoardColumns, getBoardId } from '../helpers/selectors'
 import { recalculateItemIndices } from '../helpers/positions'
 import type { TRetroBoardState, TRetroColumnItem, TRetroGroup } from '../types'
 
@@ -104,8 +103,12 @@ export const itemActions = {
   async updateItemDescription(this: TItemActionsContext, itemId: number, description: string) {
     const columns = getBoardColumns(this)
     const location = findItemLocation(columns, itemId)
+    const boardId = getBoardId(this)
     if (!location) {
       return
+    }
+    if (!boardId) {
+      throw new Error('Board not selected')
     }
 
     const { item, column, group } = location
@@ -117,6 +120,7 @@ export const itemActions = {
       let createdItem: TRetroColumnItem
       try {
         createdItem = await retroBoardService.createItem(column.id, {
+          boardId,
           description,
           groupId: group?.id ?? null,
         })
@@ -178,7 +182,7 @@ export const itemActions = {
 
     item.syncedDescription = description
     try {
-      await httpClient.patch(`/retro/items/${itemId}/description`, { description })
+      await retroBoardService.updateItemDescription(itemId, { description, boardId })
       console.info(toRaw(this.board))
     } catch (error) {
       item.description = persistedDescription
@@ -205,6 +209,7 @@ export const itemActions = {
     }
 
     const item = location.item
+    const boardId = getBoardId(this)
 
     if (currentUserId) {
       const likes = item.likes
@@ -220,8 +225,11 @@ export const itemActions = {
     if (item.isDraft) {
       return
     }
+    if (!boardId) {
+      return
+    }
 
-    void httpClient.patch(`/retro/items/${itemId}/like`)
+    void retroBoardService.updateItemLike(itemId, boardId)
   },
 
   setItemCommentsCount(this: TItemActionsContext, itemId: number, commentsCount: number) {
@@ -240,6 +248,7 @@ export const itemActions = {
 
   updateItemColor(this: TItemActionsContext, itemId: number, color?: string) {
     const location = findItemLocation(getBoardColumns(this), itemId)
+    const boardId = getBoardId(this)
     if (!location) {
       return
     }
@@ -249,12 +258,19 @@ export const itemActions = {
     if (location.item.isDraft) {
       return
     }
+    if (!boardId) {
+      return
+    }
 
-    void httpClient.patch(`/retro/items/${itemId}/color`, { color })
+    void retroBoardService.updateItemColor(itemId, { color, boardId })
   },
 
   deleteItem(this: TItemActionsContext, itemId: number) {
     this.ensureLastSyncedPositionsInitialized()
+    const boardId = getBoardId(this)
+    if (!boardId) {
+      return
+    }
 
     const columns = getBoardColumns(this)
     let isDraftItem = false
@@ -288,6 +304,6 @@ export const itemActions = {
       return
     }
 
-    void httpClient.delete(`/retro/items/${itemId}`)
+    void retroBoardService.deleteItem(itemId, boardId)
   },
 }

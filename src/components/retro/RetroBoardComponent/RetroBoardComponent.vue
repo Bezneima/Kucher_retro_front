@@ -111,6 +111,7 @@ import RetroColumnComponent from '../RetroColumnComponent/RetroColumn.vue'
 
 const retroStore = useRetroStore()
 const columns = computed(() => retroStore.getBoardColumns)
+const localColumnsCount = computed(() => columns.value.filter((column) => !column.common).length)
 const isColumnsReorderPending = computed(() => retroStore.getIsColumnsReorderPending)
 const columnsReorderError = computed(() => retroStore.getColumnsReorderError)
 const columnsSortableKey = computed(() => columns.value.map((column) => column.id).join(','))
@@ -122,15 +123,34 @@ const boardColumnsStyle = computed(() => {
 
 const columnSortableOptions = computed(() => ({
   handle: '.column-drag-handle',
+  draggable: '.column:not(.column--common)',
   animation: 150,
   ghostClass: 'board-column-ghost',
   disabled: isColumnsReorderPending.value,
+  onMove: (evt) => {
+    const dragged = evt.dragged
+    if (dragged?.dataset?.columnCommon === 'true') {
+      return false
+    }
+
+    const related = evt.related
+    const relatedColumnId = Number(related?.dataset?.columnId)
+    const relatedIndex =
+      Number.isInteger(relatedColumnId) && relatedColumnId > 0
+        ? columns.value.findIndex((column) => column.id === relatedColumnId)
+        : -1
+    const targetIndex =
+      relatedIndex >= 0 ? relatedIndex + (evt.willInsertAfter === true ? 1 : 0) : columns.value.length
+
+    return targetIndex <= localColumnsCount.value
+  },
 }))
 
 const onColumnsReorderEnd = (evt) => {
   if (isColumnsReorderPending.value) return
   if (typeof evt.oldIndex !== 'number' || typeof evt.newIndex !== 'number') return
   if (evt.oldIndex === evt.newIndex) return
+  if (evt.oldIndex >= localColumnsCount.value || evt.newIndex >= localColumnsCount.value) return
   void retroStore.reorderColumns(evt.oldIndex, evt.newIndex)
 }
 

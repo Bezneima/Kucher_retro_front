@@ -70,7 +70,10 @@ export const retroBoardService = {
     return response.data
   },
 
-  async createGroup(columnId: number, payload: { name: string; description?: string; color?: ColumnColor }) {
+  async createGroup(
+    columnId: number,
+    payload: { boardId: number; name: string; description?: string; color?: ColumnColor },
+  ) {
     try {
       const response = await httpClient.post(`/retro/columns/${columnId}/groups`, payload)
       return response.data as TRetroGroup
@@ -79,45 +82,93 @@ export const retroBoardService = {
     }
   },
 
-  async updateColumnCommon(columnId: number, common: boolean): Promise<TRetroColumn> {
+  async updateColumnCommon(
+    columnId: number,
+    payload: { common: boolean; boardId: number },
+  ): Promise<TRetroColumn> {
     try {
-      const response = await httpClient.patch(`/retro/columns/${columnId}/common`, { common })
+      const response = await httpClient.patch(`/retro/columns/${columnId}/common`, payload)
       return response.data as TRetroColumn
     } catch (error) {
       throw getApiErrorMessage(error, 'Не удалось обновить признак общей колонки')
     }
   },
 
-  async updateGroupName(groupId: number, name: string) {
+  async updateColumnName(columnId: number, payload: { name: string; boardId: number }) {
     try {
-      const response = await httpClient.patch(`/retro/groups/${groupId}/name`, { name })
+      const response = await httpClient.patch(`/retro/columns/${columnId}/name`, payload)
+      return response.data as TRetroColumn
+    } catch (error) {
+      throw getApiErrorMessage(error, 'Не удалось обновить название колонки')
+    }
+  },
+
+  async updateColumnColor(columnId: number, payload: { color: ColumnColor; boardId: number }) {
+    try {
+      const response = await httpClient.patch(`/retro/columns/${columnId}/color`, payload)
+      return response.data as TRetroColumn
+    } catch (error) {
+      throw getApiErrorMessage(error, 'Не удалось обновить цвет колонки')
+    }
+  },
+
+  async updateColumnDescription(
+    columnId: number,
+    payload: { description: string; boardId: number },
+  ) {
+    try {
+      const response = await httpClient.patch(`/retro/columns/${columnId}/description`, payload)
+      return response.data as TRetroColumn
+    } catch (error) {
+      throw getApiErrorMessage(error, 'Не удалось обновить описание колонки')
+    }
+  },
+
+  async deleteColumn(columnId: number, boardId: number) {
+    try {
+      await httpClient.delete(`/retro/columns/${columnId}`, {
+        params: { boardId },
+      })
+    } catch (error) {
+      throw getApiErrorMessage(error, 'Не удалось удалить колонку')
+    }
+  },
+
+  async updateGroupName(groupId: number, payload: { name: string; boardId: number }) {
+    try {
+      const response = await httpClient.patch(`/retro/groups/${groupId}/name`, payload)
       return response.data as TRetroGroup
     } catch (error) {
       throw getApiErrorMessage(error, 'Не удалось обновить название группы')
     }
   },
 
-  async updateGroupColor(groupId: number, color: ColumnColor) {
+  async updateGroupColor(groupId: number, payload: { color: ColumnColor; boardId: number }) {
     try {
-      const response = await httpClient.patch(`/retro/groups/${groupId}/color`, { color })
+      const response = await httpClient.patch(`/retro/groups/${groupId}/color`, payload)
       return response.data as TRetroGroup
     } catch (error) {
       throw getApiErrorMessage(error, 'Не удалось обновить цвет группы')
     }
   },
 
-  async updateGroupDescription(groupId: number, description: string) {
+  async updateGroupDescription(
+    groupId: number,
+    payload: { description: string; boardId: number },
+  ) {
     try {
-      const response = await httpClient.patch(`/retro/groups/${groupId}/description`, { description })
+      const response = await httpClient.patch(`/retro/groups/${groupId}/description`, payload)
       return response.data as TRetroGroup
     } catch (error) {
       throw getApiErrorMessage(error, 'Не удалось обновить описание группы')
     }
   },
 
-  async deleteGroup(groupId: number) {
+  async deleteGroup(groupId: number, boardId: number) {
     try {
-      await httpClient.delete(`/retro/groups/${groupId}`)
+      await httpClient.delete(`/retro/groups/${groupId}`, {
+        params: { boardId },
+      })
     } catch (error) {
       throw getApiErrorMessage(error, 'Не удалось удалить группу')
     }
@@ -134,13 +185,50 @@ export const retroBoardService = {
 
   async createItem(
     columnId: number,
-    payload: { description: string; groupId?: number | null },
+    payload: { description: string; groupId?: number | null; boardId: number },
   ): Promise<TRetroColumnItem> {
     try {
       const response = await httpClient.post(`/retro/columns/${columnId}/items`, payload)
       return response.data as TRetroColumnItem
     } catch (error) {
       throw getApiErrorMessage(error, 'Не удалось создать карточку')
+    }
+  },
+
+  async updateItemDescription(itemId: number, payload: { description: string; boardId: number }) {
+    try {
+      const response = await httpClient.patch(`/retro/items/${itemId}/description`, payload)
+      return response.data as TRetroColumnItem
+    } catch (error) {
+      throw getApiErrorMessage(error, 'Не удалось обновить текст карточки')
+    }
+  },
+
+  async updateItemLike(itemId: number, boardId: number) {
+    try {
+      const response = await httpClient.patch(`/retro/items/${itemId}/like`, { boardId })
+      return response.data as TRetroColumnItem
+    } catch (error) {
+      throw getApiErrorMessage(error, 'Не удалось обновить лайк карточки')
+    }
+  },
+
+  async updateItemColor(itemId: number, payload: { color?: string; boardId: number }) {
+    try {
+      const response = await httpClient.patch(`/retro/items/${itemId}/color`, payload)
+      return response.data as TRetroColumnItem
+    } catch (error) {
+      throw getApiErrorMessage(error, 'Не удалось обновить цвет карточки')
+    }
+  },
+
+  async deleteItem(itemId: number, boardId: number) {
+    try {
+      await httpClient.delete(`/retro/items/${itemId}`, {
+        params: { boardId },
+      })
+    } catch (error) {
+      throw getApiErrorMessage(error, 'Не удалось удалить карточку')
     }
   },
 

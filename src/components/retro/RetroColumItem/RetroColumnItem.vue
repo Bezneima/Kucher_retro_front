@@ -767,6 +767,7 @@ const commentActionError = ref('')
 
 let commentsLoadRequestId = 0
 
+const currentBoardId = computed(() => retroStore.getCurrentBoardId)
 const currentUserId = computed(() => retroStore.getCurrentUserId)
 const currentUserTeamRole = computed(() => retroStore.getCurrentUserTeamRole)
 const cardUiState = computed(() =>
@@ -1032,10 +1033,15 @@ async function saveAndClose() {
     const status =
       typeof error === 'object' &&
       error !== null &&
-      'response' in error &&
-      typeof (error as { response?: { status?: number } }).response?.status === 'number'
-        ? (error as { response?: { status?: number } }).response?.status
-        : undefined
+      'status' in error &&
+      typeof (error as { status?: unknown }).status === 'number'
+        ? (error as { status: number }).status
+        : typeof error === 'object' &&
+            error !== null &&
+            'response' in error &&
+            typeof (error as { response?: { status?: number } }).response?.status === 'number'
+          ? (error as { response?: { status?: number } }).response?.status
+          : undefined
 
     if (status === 403) {
       pushNotification('error', 'Редактирование недоступно', 'Редактирование карточек отключено')
@@ -1085,14 +1091,17 @@ const onLikeButtonClick = (e: MouseEvent) => {
 
 const onCreateCommentSubmit = async () => {
   const text = newCommentText.value.trim()
-  if (!isBoardCommentsVisible.value || !text || props.element.isDraft) return
+  if (!isBoardCommentsVisible.value || !text || props.element.isDraft || !currentBoardId.value) return
 
   isCreateCommentPending.value = true
   createCommentError.value = ''
   commentActionError.value = ''
 
   try {
-    const createdComment = await retroCommentsService.createItemComment(props.element.id, { text })
+    const createdComment = await retroCommentsService.createItemComment(props.element.id, {
+      text,
+      boardId: currentBoardId.value,
+    })
 
     retroStore.mergeCommentCache(createdComment)
     newCommentText.value = ''
@@ -1122,7 +1131,7 @@ const onCancelCommentEditing = () => {
 }
 
 const onSaveEditedComment = async (commentId: number) => {
-  if (!isBoardCommentsVisible.value) return
+  if (!isBoardCommentsVisible.value || !currentBoardId.value) return
 
   const text = editingCommentText.value.trim()
   if (!text) {
@@ -1136,7 +1145,10 @@ const onSaveEditedComment = async (commentId: number) => {
   commentActionError.value = ''
 
   try {
-    const updatedComment = await retroCommentsService.updateComment(commentId, { text })
+    const updatedComment = await retroCommentsService.updateComment(commentId, {
+      text,
+      boardId: currentBoardId.value,
+    })
 
     retroStore.mergeCommentCache(updatedComment)
 
@@ -1151,7 +1163,7 @@ const onSaveEditedComment = async (commentId: number) => {
 }
 
 const onDeleteComment = async (commentId: number) => {
-  if (!isBoardCommentsVisible.value) return
+  if (!isBoardCommentsVisible.value || !currentBoardId.value) return
   const comment = comments.value.find((entry) => entry.id === commentId)
   if (!comment || !canDeleteComment(comment)) return
 
@@ -1160,7 +1172,7 @@ const onDeleteComment = async (commentId: number) => {
   commentActionError.value = ''
 
   try {
-    const response = await retroCommentsService.deleteComment(commentId)
+    const response = await retroCommentsService.deleteComment(commentId, currentBoardId.value)
     if (!response.deleted) {
       commentActionError.value = 'Сервер не подтвердил удаление комментария.'
       return

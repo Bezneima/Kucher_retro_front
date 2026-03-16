@@ -19,10 +19,12 @@ export type RetroItemCommentResponseDto = {
 
 export type RetroCreateCommentPayload = {
   text: string
+  boardId: number
 }
 
 export type RetroUpdateCommentPayload = {
   text: string
+  boardId: number
 }
 
 export type RetroDeleteCommentResponseDto = {
@@ -183,9 +185,11 @@ export const toRetroCommentsApiError = (
 }
 
 export const retroCommentsService = {
-  async getItemComments(itemId: number): Promise<RetroItemCommentResponseDto[]> {
+  async getItemComments(itemId: number, boardId: number): Promise<RetroItemCommentResponseDto[]> {
     try {
-      const response = await httpClient.get(`/retro/items/${itemId}/comments`)
+      const response = await httpClient.get(`/retro/items/${itemId}/comments`, {
+        params: { boardId },
+      })
       return normalizeCommentCollection(response.data)
     } catch (error) {
       throw toRetroCommentsApiError(error, 'Не удалось загрузить комментарии')
@@ -223,9 +227,11 @@ export const retroCommentsService = {
       throw toRetroCommentsApiError(error, 'Не удалось обновить комментарий')
     }
   },
-  async deleteComment(commentId: number): Promise<RetroDeleteCommentResponseDto> {
+  async deleteComment(commentId: number, boardId: number): Promise<RetroDeleteCommentResponseDto> {
     try {
-      const response = await httpClient.delete(`/retro/comments/${commentId}`)
+      const response = await httpClient.delete(`/retro/comments/${commentId}`, {
+        params: { boardId },
+      })
       return normalizeDeleteResponse(response.data)
     } catch (error) {
       throw toRetroCommentsApiError(error, 'Не удалось удалить комментарий')

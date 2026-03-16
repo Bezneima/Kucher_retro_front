@@ -2,7 +2,6 @@ import { httpClient } from '@/api/httpClient'
 import { retroBoardService } from '@/api/services/retroBoardService'
 import { reorderBoardColumns } from '@/shared/socket'
 import { availableColors, goodCardColors } from '../constants'
-import { normalizeColumns } from '../helpers/normalize'
 import { findColumnById, getBoardColumns, getBoardId } from '../helpers/selectors'
 import { reorderColumnsByPayloadIds } from '../helpers/reorderColumns'
 import type { TRetroColumn, TRetroColumnColor } from '../types'
@@ -102,13 +101,15 @@ export const columnActions = {
   },
   updateColumnDescription(this: any, columnId: number, description: string) {
     const column = findColumnById(this, columnId)
+    const boardId = getBoardId(this)
     if (!column) return
+    if (!boardId) return
 
     const previousDescription = column.description
     column.description = description
 
-    void httpClient
-      .patch(`/retro/columns/${columnId}/description`, { description })
+    void retroBoardService
+      .updateColumnDescription(columnId, { description, boardId })
       .catch((error) => {
         column.description = previousDescription
         console.error('[retro] failed to update column description', error)
@@ -116,49 +117,51 @@ export const columnActions = {
   },
   updateColumnNameEnd(this: any, columnId: number) {
     const column = findColumnById(this, columnId)
+    const boardId = getBoardId(this)
     if (column) {
       column.isNameEditing = false
-      void httpClient.patch(`/retro/columns/${columnId}/name`, { name: column.name })
+      if (!boardId) {
+        return
+      }
+      void retroBoardService.updateColumnName(columnId, { name: column.name, boardId })
     }
   },
   updateColumnColor(this: any, columnId: number, color: TRetroColumnColor) {
     const column = findColumnById(this, columnId)
+    const boardId = getBoardId(this)
     if (!column) return
+    if (!boardId) return
 
     column.color = color
-    void httpClient.patch(`/retro/columns/${columnId}/color`, { color })
+    void retroBoardService.updateColumnColor(columnId, { color, boardId })
   },
   async toggleColumnCommon(this: any, columnId: number) {
     const column = findColumnById(this, columnId)
-    if (!column) return
+    const boardId = getBoardId(this)
+    if (!column || !boardId) return
 
-    const updatedColumnPayload = await retroBoardService.updateColumnCommon(columnId, !column.common)
-    const normalizedColumn = normalizeColumns([{ ...column, ...updatedColumnPayload }])[0]
-    if (!normalizedColumn) {
-      return
-    }
-
-    column.name = normalizedColumn.name
-    column.description = normalizedColumn.description
-    column.color = normalizedColumn.color
-    column.common = normalizedColumn.common
-    column.items = normalizedColumn.items
-    column.groups = normalizedColumn.groups
-    column.entries = normalizedColumn.entries
-    column.isDraft = normalizedColumn.isDraft
+    await retroBoardService.updateColumnCommon(columnId, {
+      common: !column.common,
+      boardId,
+    })
+    await this.loadBoardColumns(boardId)
   },
   deleteColumn(this: any, columnId: number) {
     const columns = getBoardColumns(this)
+    const boardId = getBoardId(this)
     const columnIndex = columns.findIndex((column) => column.id === columnId)
-    if (columnIndex < 0) return
+    if (columnIndex < 0 || !boardId) return
 
     const [deletedColumn] = columns.splice(columnIndex, 1)
     if (!deletedColumn) return
 
-    void httpClient.delete(`/retro/columns/${columnId}`).catch((error) => {
-      columns.splice(columnIndex, 0, deletedColumn)
-      console.error('[retro] failed to delete column', error)
-    })
+    void retroBoardService
+      .deleteColumn(columnId, boardId)
+      .then(() => this.loadBoardColumns(boardId))
+      .catch((error) => {
+        columns.splice(columnIndex, 0, deletedColumn)
+        console.error('[retro] failed to delete column', error)
+      })
   },
 
   /** Меняет порядок колонок по индексам (после перетаскивания). */
@@ -173,6 +176,19 @@ export const columnActions = {
     }
 
     if (oldIndex < 0 || newIndex < 0 || oldIndex >= columns.length || newIndex >= columns.length) {
+      return
+    }
+
+    const localColumnsCount = columns.filter((column) => !column.common).length
+    const oldColumn = columns[oldIndex]
+    const newColumn = columns[newIndex]
+    if (
+      oldIndex >= localColumnsCount ||
+      newIndex >= localColumnsCount ||
+      oldColumn?.common === true ||
+      newColumn?.common === true
+    ) {
+      this.columnsReorderError = 'Общие колонки нельзя перемещать, а локальные можно менять только внутри своей секции'
       return
     }
 
@@ -217,7 +233,8 @@ export const columnActions = {
     const boardId = getBoardId(this)
     if (!boardId) return
 
-    const nextColumnNumber = columns.length + 1
+    const localColumnsCount = columns.filter((column) => !column.common).length
+    const nextColumnNumber = localColumnsCount + 1
     const fallbackColor =
       availableColors[(nextColumnNumber - 1) % availableColors.length] ??
       ({
@@ -239,7 +256,7 @@ export const columnActions = {
       entries: [],
     }
 
-    columns.push(createdColumn)
+    columns.splice(localColumnsCount, 0, createdColumn)
 
     void httpClient
       .post(`/retro/boards/${boardId}/columns`, {

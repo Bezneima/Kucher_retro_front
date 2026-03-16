@@ -26,6 +26,7 @@ const getDefaultCardsEditability = () => {
 export const retroGetters = {
   getBoard: (state: TRetroBoardState) => state.board,
   getBoardColumns: (state: TRetroBoardState) => state.board[0]?.columns ?? [],
+  getCurrentBoardId: (state: TRetroBoardState) => state.board[0]?.id ?? null,
   getIsColumnsReorderPending: (state: TRetroBoardState) => state.isColumnsReorderPending,
   getColumnsReorderError: (state: TRetroBoardState) => state.columnsReorderError,
   getCurrentBoardTeamId: (state: TRetroBoardState) => state.board[0]?.teamId ?? null,

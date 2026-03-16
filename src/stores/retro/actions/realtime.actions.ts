@@ -822,8 +822,12 @@ export const realtimeActions = {
       this.clearItemCommentsCache(itemId)
       return []
     }
+    const boardId = getCurrentBoard(this)?.id
+    if (!boardId) {
+      return []
+    }
 
-    const comments = await retroCommentsService.getItemComments(itemId)
+    const comments = await retroCommentsService.getItemComments(itemId, boardId)
     this.setCommentsCache(itemId, comments)
     return comments
   },

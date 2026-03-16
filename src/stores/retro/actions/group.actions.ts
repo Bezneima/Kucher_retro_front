@@ -60,8 +60,12 @@ const normalizeGroupResponse = (
 
 export const groupActions = {
   async createGroup(this: TGroupActionsContext, columnId: number, name = 'Новая группа') {
+    const boardId = getBoardId(this)
     const columns = getBoardColumns(this)
     const columnIndex = columns.findIndex((column) => column.id === columnId)
+    if (!boardId) {
+      throw new Error('Board not selected')
+    }
     if (columnIndex < 0) {
       throw new Error(`Column id ${columnId} not found`)
     }
@@ -103,6 +107,7 @@ export const groupActions = {
 
     try {
       const created = await retroBoardService.createGroup(columnId, {
+        boardId,
         name: draftGroup.name,
         description: draftGroup.description,
         color: draftGroup.color,
@@ -143,8 +148,12 @@ export const groupActions = {
 
   async updateGroupName(this: TGroupActionsContext, groupId: number, name: string) {
     const normalizedName = name.trim()
+    const boardId = getBoardId(this)
     if (!normalizedName) {
       return
+    }
+    if (!boardId) {
+      throw new Error('Board not selected')
     }
 
     for (const column of getBoardColumns(this)) {
@@ -157,7 +166,7 @@ export const groupActions = {
       group.name = normalizedName
 
       try {
-        await retroBoardService.updateGroupName(groupId, normalizedName)
+        await retroBoardService.updateGroupName(groupId, { name: normalizedName, boardId })
       } catch (error) {
         group.name = previousName
         throw error
@@ -168,6 +177,11 @@ export const groupActions = {
   },
 
   async updateGroupColor(this: TGroupActionsContext, groupId: number, color: ColumnColor) {
+    const boardId = getBoardId(this)
+    if (!boardId) {
+      throw new Error('Board not selected')
+    }
+
     for (const column of getBoardColumns(this)) {
       const group = column.groups.find((entry) => entry.id === groupId)
       if (!group) {
@@ -178,7 +192,7 @@ export const groupActions = {
       group.color = { ...color }
 
       try {
-        await retroBoardService.updateGroupColor(groupId, color)
+        await retroBoardService.updateGroupColor(groupId, { color, boardId })
       } catch (error) {
         group.color = previousColor
         throw error
@@ -189,6 +203,11 @@ export const groupActions = {
   },
 
   async updateGroupDescription(this: TGroupActionsContext, groupId: number, description: string) {
+    const boardId = getBoardId(this)
+    if (!boardId) {
+      throw new Error('Board not selected')
+    }
+
     for (const column of getBoardColumns(this)) {
       const group = column.groups.find((entry) => entry.id === groupId)
       if (!group) {
@@ -199,7 +218,7 @@ export const groupActions = {
       group.description = description
 
       try {
-        await retroBoardService.updateGroupDescription(groupId, description)
+        await retroBoardService.updateGroupDescription(groupId, { description, boardId })
       } catch (error) {
         group.description = previousDescription
         throw error
@@ -211,11 +230,12 @@ export const groupActions = {
 
   async deleteGroup(this: TGroupActionsContext, groupId: number) {
     const boardId = getBoardId(this)
-
-    await retroBoardService.deleteGroup(groupId)
-    if (boardId) {
-      await this.loadBoardColumns(boardId)
+    if (!boardId) {
+      throw new Error('Board not selected')
     }
+
+    await retroBoardService.deleteGroup(groupId, boardId)
+    await this.loadBoardColumns(boardId)
   },
 
   async addItemToGroup(this: any, columnId: number, groupId: number) {

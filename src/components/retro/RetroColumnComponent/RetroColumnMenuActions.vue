@@ -19,9 +19,14 @@
     @click="onToggleCommonClick"
   >
     <span class="retro-item-menu-button__status" aria-hidden="true"></span>
-    {{ props.isToggleCommonPending ? 'Сохранение...' : 'Сделать общей' }}
+    {{ props.isToggleCommonPending ? 'Сохранение...' : 'Сделать колонку общей' }}
   </button>
-  <button v-if="props.canCreateCards !== false" class="retro-item-menu-button" type="button" @click="onCreateGroupClick">
+  <button
+    v-if="props.canCreateCards !== false"
+    class="retro-item-menu-button"
+    type="button"
+    @click="onCreateGroupClick"
+  >
     <img src="@/assets/icons/svg/addColumn.svg" alt="" class="retro-item-menu-button__icon" />
     Создать группу
   </button>
