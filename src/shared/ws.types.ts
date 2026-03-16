@@ -47,6 +47,7 @@ export type WsColumn = {
   name?: string
   description?: string
   color?: unknown
+  common?: boolean
   items?: unknown
   groups?: unknown
   entries?: unknown
@@ -99,6 +100,7 @@ export type RetroColumnResponseDto = {
   name: string
   description: string
   color?: unknown
+  common?: boolean
   isNameEditing?: boolean
   items: RetroItemResponseDto[]
   groups?: RetroGroupResponseDto[]

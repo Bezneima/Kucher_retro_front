@@ -51,6 +51,7 @@ export type RetroColumn = {
   name: string
   description: string
   color: ColumnColor
+  common: boolean
   isNameEditing: boolean
   items: RetroItem[]
   groups: RetroGroup[]

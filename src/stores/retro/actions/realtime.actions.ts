@@ -293,7 +293,7 @@ const normalizeNewColumn = (payload: WsColumn, fallbackIndex: number): TRetroCol
 const applyColumnFieldMerge = (
   column: TRetroColumn,
   payload: WsColumn,
-  fields: { name?: boolean; description?: boolean; color?: boolean },
+  fields: { name?: boolean; description?: boolean; color?: boolean; common?: boolean },
 ) => {
   if (fields.name && typeof payload.name === 'string' && payload.name.trim()) {
     column.name = payload.name
@@ -303,6 +303,9 @@ const applyColumnFieldMerge = (
   }
   if (fields.color && 'color' in payload) {
     column.color = normalizeColumnColorPayload(payload.color, column.color)
+  }
+  if (fields.common && typeof payload.common === 'boolean') {
+    column.common = payload.common
   }
 }
 
@@ -435,6 +438,7 @@ const normalizeSyncColumn = (
     description:
       typeof payload.description === 'string' ? payload.description : existingColumn.description,
     color: normalizeColumnColorPayload(payload.color, existingColumn.color),
+    common: typeof payload.common === 'boolean' ? payload.common : existingColumn.common,
     isNameEditing:
       typeof payload.isNameEditing === 'boolean' ? payload.isNameEditing : existingColumn.isNameEditing,
     items,
@@ -902,6 +906,7 @@ export const realtimeActions = {
         name: true,
         description: true,
         color: true,
+        common: true,
       })
       patchBoardReference(this)
       return
@@ -921,6 +926,7 @@ export const realtimeActions = {
         name: true,
         description: true,
         color: true,
+        common: true,
       })
 
       if (targetIndex != null && targetIndex < board.columns.length && targetIndex !== draftIndex) {

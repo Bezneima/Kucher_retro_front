@@ -376,6 +376,7 @@ const normalizeColumn = (columnData: unknown, columnIndex: number): RetroColumn 
     name: asString(rawColumn.name) ?? `Column ${columnIndex + 1}`,
     description: asString(rawColumn.description) ?? '',
     color: normalizeColumnColor(rawColumn.color, columnIndex),
+    common: rawColumn.common === true,
     isNameEditing: rawColumn.isNameEditing === true,
     isDraft: false,
     items: normalizedRootItems,

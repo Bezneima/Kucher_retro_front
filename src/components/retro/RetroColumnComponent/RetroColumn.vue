@@ -50,11 +50,14 @@
         :is-open="isMenuOpen"
         :anchor-el="menuButtonRef"
         :column-color="column.color.columnColor"
+        :is-common="column.common"
+        :is-toggle-common-pending="isToggleCommonPending"
         :can-create-cards="canCreateCards"
         @close="closeMenu"
         @edit-column="onEditColumnClick"
         @edit-description="onEditDescriptionClick"
         @copy-name="onCopyNameClick"
+        @toggle-common="onToggleCommonClick"
         @create-group="onCreateGroupClick"
         @set-color="onSetColumnColor"
         @remove-color="onRemoveColumnColor"
@@ -199,6 +202,7 @@ const isMenuOpen = ref(false)
 const isDeleteColumnModalOpen = ref(false)
 const isEditColumnModalOpen = ref(false)
 const isEditDescriptionModalOpen = ref(false)
+const isToggleCommonPending = ref(false)
 const nameDraft = ref('')
 const descriptionDraft = ref('')
 const rootNodes = ref<TRootNode[]>([])
@@ -376,6 +380,26 @@ const onRemoveColumnColor = () => {
 const onDeleteColumn = () => {
   closeMenu()
   isDeleteColumnModalOpen.value = true
+}
+
+const onToggleCommonClick = async () => {
+  if (isToggleCommonPending.value) {
+    return
+  }
+
+  isToggleCommonPending.value = true
+
+  try {
+    await retroStore.toggleColumnCommon(column.value.id)
+  } catch (error) {
+    const message =
+      error instanceof Error && typeof error.message === 'string' && error.message
+        ? error.message
+        : 'Не удалось обновить признак общей колонки'
+    pushNotification('error', 'Ошибка колонки', message)
+  } finally {
+    isToggleCommonPending.value = false
+  }
 }
 
 const onCloseDeleteColumnModal = () => {

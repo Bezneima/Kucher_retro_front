@@ -13,10 +13,13 @@
       <RetroColumnMenuActions
         v-if="!isColorMenuOpen"
         :column-color="props.columnColor"
+        :is-common="props.isCommon"
+        :is-toggle-common-pending="props.isToggleCommonPending"
         :can-create-cards="props.canCreateCards"
         @edit-column="onEditColumnClick"
         @edit-description="onEditDescriptionClick"
         @copy-name="onCopyNameClick"
+        @toggle-common="onToggleCommonClick"
         @create-group="onCreateGroupClick"
         @open-color-menu="openColorMenu"
         @remove-color="onRemoveColorClick"
@@ -37,6 +40,8 @@ const props = defineProps<{
   isOpen: boolean
   anchorEl: HTMLElement | null
   columnColor?: string
+  isCommon: boolean
+  isToggleCommonPending: boolean
   canCreateCards?: boolean
 }>()
 
@@ -45,6 +50,7 @@ const emit = defineEmits<{
   editColumn: []
   editDescription: []
   copyName: []
+  toggleCommon: []
   createGroup: []
   setColor: [color: TRetroColumnColor]
   removeColor: []
@@ -145,6 +151,11 @@ const onEditColumnClick = () => {
 
 const onCopyNameClick = () => {
   emit('copyName')
+  emit('close')
+}
+
+const onToggleCommonClick = () => {
+  emit('toggleCommon')
   emit('close')
 }
 

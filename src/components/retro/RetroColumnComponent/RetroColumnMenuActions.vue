@@ -11,6 +11,16 @@
     <img src="@/assets/icons/svg/copy.svg" alt="" class="retro-item-menu-button__icon" />
     Копировать название
   </button>
+  <button
+    :class="['retro-item-menu-button', { 'retro-item-menu-button-active': props.isCommon }]"
+    type="button"
+    :disabled="props.isToggleCommonPending"
+    :aria-pressed="props.isCommon"
+    @click="onToggleCommonClick"
+  >
+    <span class="retro-item-menu-button__status" aria-hidden="true"></span>
+    {{ props.isToggleCommonPending ? 'Сохранение...' : 'Сделать общей' }}
+  </button>
   <button v-if="props.canCreateCards !== false" class="retro-item-menu-button" type="button" @click="onCreateGroupClick">
     <img src="@/assets/icons/svg/addColumn.svg" alt="" class="retro-item-menu-button__icon" />
     Создать группу
@@ -45,6 +55,7 @@ const emit = defineEmits<{
   editColumn: []
   editDescription: []
   copyName: []
+  toggleCommon: []
   createGroup: []
   openColorMenu: []
   removeColor: []
@@ -53,12 +64,15 @@ const emit = defineEmits<{
 
 const props = defineProps<{
   columnColor?: string
+  isCommon: boolean
+  isToggleCommonPending: boolean
   canCreateCards?: boolean
 }>()
 
 const onEditColumnClick = () => emit('editColumn')
 const onEditDescriptionClick = () => emit('editDescription')
 const onCopyNameClick = () => emit('copyName')
+const onToggleCommonClick = () => emit('toggleCommon')
 const onCreateGroupClick = () => emit('createGroup')
 const onOpenColorMenuClick = () => emit('openColorMenu')
 const onRemoveColorClick = () => emit('removeColor')
@@ -93,11 +107,39 @@ const onDeleteColumnClick = () => emit('deleteColumn')
   background: #eef4fe;
 }
 
+.retro-item-menu-button:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.retro-item-menu-button:disabled:hover {
+  background: transparent;
+}
+
+.retro-item-menu-button-active {
+  background: #eef4fe;
+  color: #22406f;
+}
+
 .retro-item-menu-button-delete {
   margin-top: 4px;
   border-top: 1px solid #d5e2f4;
   border-radius: 0 0 8px 8px;
   padding-top: 12px;
   color: #d24c5d;
+}
+
+.retro-item-menu-button__status {
+  flex-shrink: 0;
+  width: 18px;
+  height: 18px;
+  border: 1.5px solid #b7c8df;
+  border-radius: 9999px;
+  background: #fff;
+}
+
+.retro-item-menu-button-active .retro-item-menu-button__status {
+  border-color: #2f70d9;
+  background: radial-gradient(circle, #2f70d9 0 4px, #fff 5px);
 }
 </style>

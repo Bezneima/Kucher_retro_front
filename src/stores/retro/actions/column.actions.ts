@@ -1,6 +1,8 @@
 import { httpClient } from '@/api/httpClient'
+import { retroBoardService } from '@/api/services/retroBoardService'
 import { reorderBoardColumns } from '@/shared/socket'
 import { availableColors, goodCardColors } from '../constants'
+import { normalizeColumns } from '../helpers/normalize'
 import { findColumnById, getBoardColumns, getBoardId } from '../helpers/selectors'
 import { reorderColumnsByPayloadIds } from '../helpers/reorderColumns'
 import type { TRetroColumn, TRetroColumnColor } from '../types'
@@ -126,6 +128,25 @@ export const columnActions = {
     column.color = color
     void httpClient.patch(`/retro/columns/${columnId}/color`, { color })
   },
+  async toggleColumnCommon(this: any, columnId: number) {
+    const column = findColumnById(this, columnId)
+    if (!column) return
+
+    const updatedColumnPayload = await retroBoardService.updateColumnCommon(columnId, !column.common)
+    const normalizedColumn = normalizeColumns([{ ...column, ...updatedColumnPayload }])[0]
+    if (!normalizedColumn) {
+      return
+    }
+
+    column.name = normalizedColumn.name
+    column.description = normalizedColumn.description
+    column.color = normalizedColumn.color
+    column.common = normalizedColumn.common
+    column.items = normalizedColumn.items
+    column.groups = normalizedColumn.groups
+    column.entries = normalizedColumn.entries
+    column.isDraft = normalizedColumn.isDraft
+  },
   deleteColumn(this: any, columnId: number) {
     const columns = getBoardColumns(this)
     const columnIndex = columns.findIndex((column) => column.id === columnId)
@@ -210,6 +231,7 @@ export const columnActions = {
       name: `Column ${nextColumnNumber}`,
       description: '',
       color: { ...fallbackColor },
+      common: false,
       isNameEditing: false,
       isDraft: true,
       items: [],

@@ -79,6 +79,15 @@ export const retroBoardService = {
     }
   },
 
+  async updateColumnCommon(columnId: number, common: boolean): Promise<TRetroColumn> {
+    try {
+      const response = await httpClient.patch(`/retro/columns/${columnId}/common`, { common })
+      return response.data as TRetroColumn
+    } catch (error) {
+      throw getApiErrorMessage(error, 'Не удалось обновить признак общей колонки')
+    }
+  },
+
   async updateGroupName(groupId: number, name: string) {
     try {
       const response = await httpClient.patch(`/retro/groups/${groupId}/name`, { name })
