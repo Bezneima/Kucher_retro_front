@@ -50,6 +50,7 @@
         :is-open="isMenuOpen"
         :anchor-el="menuButtonRef"
         :column-color="column.color.columnColor"
+        :can-create-cards="canCreateCards"
         @close="closeMenu"
         @edit-column="onEditColumnClick"
         @edit-description="onEditDescriptionClick"
@@ -60,6 +61,7 @@
         @delete-column="onDeleteColumn"
       />
       <button
+        v-if="canCreateCards"
         class="column-add-button"
         type="button"
         title="Добавить карточку в колонку"
@@ -210,6 +212,7 @@ const rootSortableKey = computed(() => rootNodes.value.map((node) => rootNodeKey
 
 const isCardFilterActive = computed(() => retroStore.getHasCardSearchQuery)
 const filteredEntries = computed(() => retroStore.getFilteredColumnEntries(column.value.id))
+const canCreateCards = computed(() => retroStore.getCanEditBoardCards)
 
 const updateScrollShadows = () => {
   const container = scrollContainerRef.value
@@ -448,10 +451,18 @@ const onRootUpdate = (event: any) => {
 }
 
 const onAddItemClick = () => {
+  if (!canCreateCards.value) {
+    return
+  }
+
   retroStore.addItemToColumn(column.value.id)
 }
 
 const onCreateGroupClick = async () => {
+  if (!canCreateCards.value) {
+    return
+  }
+
   try {
     await retroStore.createGroup(column.value.id)
   } catch (error) {

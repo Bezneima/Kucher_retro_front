@@ -143,7 +143,10 @@ export const retroBoardService = {
       throw getApiErrorMessage(error, 'Не удалось синхронизировать позиции карточек')
     }
   },
-  async updateBoardSettings(boardId: number, payload: { showLikes: boolean }) {
+  async updateBoardSettings(
+    boardId: number,
+    payload: { showLikes: boolean; showComments: boolean; canEditCards: boolean },
+  ) {
     try {
       const response = await httpClient.patch(`/retro/boards/${boardId}/settings`, payload)
       return response.data

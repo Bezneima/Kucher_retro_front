@@ -84,6 +84,7 @@
           </div>
 
           <button
+            v-if="isBoardCommentsVisible"
             type="button"
             class="card-footer-comment-container"
             :class="{ 'card-footer-comment-container-open': isCommentsOpen }"
@@ -99,7 +100,7 @@
       </template>
     </div>
     <button
-      v-if="!isCommentsOpen && cardUiState.showFooterMeta && element.commentsCount > 0"
+      v-if="isBoardCommentsVisible && !isCommentsOpen && cardUiState.showFooterMeta && element.commentsCount > 0"
       type="button"
       class="card-show-comments-hint"
       @click="onCommentsToggleClick"
@@ -112,7 +113,7 @@
     </button>
 
     <section
-      v-if="isCommentsOpen"
+      v-if="isBoardCommentsVisible && isCommentsOpen"
       class="card-comments"
       @click.stop
       @mousedown.stop
@@ -724,12 +725,14 @@ import {
 import { getAccessToken } from '@/auth/session'
 import ConfirmDeleteModal from '@/components/common/ConfirmDeleteModal/ConfirmDeleteModal.vue'
 import SvgIcon from '@/components/common/SvgIcon/SvgIcon.vue'
+import { useBoardNotifications } from '@/composables/useBoardNotifications'
 import { useRetroStore } from '@/stores/RetroStore'
 import type { TRetroColumnItem } from '@/stores/RetroStore'
 import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
 import RetroColumnItemMenu from './RetroColumnItemMenu.vue'
 
 const retroStore = useRetroStore()
+const { pushNotification } = useBoardNotifications()
 const props = defineProps<{
   element: TRetroColumnItem
 }>()
@@ -779,11 +782,14 @@ const isAnyCommentActionPending = computed(() => {
 })
 
 const canCreateComment = computed(() => {
+  if (!isBoardCommentsVisible.value) return false
   if (props.element.isDraft) return false
   return newCommentText.value.trim().length > 0
 })
 
 const isBoardLikesVisible = computed(() => retroStore.getIsBoardLikesVisible)
+const isBoardCommentsVisible = computed(() => retroStore.getIsBoardCommentsVisible)
+const canEditCardText = computed(() => retroStore.getCanEditBoardCards)
 
 const canLikeItem = computed(() => {
   if (!isBoardLikesVisible.value) {
@@ -814,6 +820,10 @@ const itemStyle = computed(() => (props.element.color ? { '--item-bg': props.ele
 
 const getCommentApiErrorMessage = (error: unknown, fallbackMessage: string) => {
   const apiError = toRetroCommentsApiError(error, fallbackMessage)
+
+  if (apiError.status === 403 && apiError.message === 'Comments are disabled for this board') {
+    return ''
+  }
 
   switch (apiError.status) {
     case 400:
@@ -883,7 +893,23 @@ const resetCommentsState = (itemIdToClear?: number) => {
   hasLoadedComments.value = false
 }
 
+const handleCommentsDisabledError = (error: unknown) => {
+  const apiError = toRetroCommentsApiError(error, '')
+  if (apiError.status !== 403 || apiError.message !== 'Comments are disabled for this board') {
+    return false
+  }
+
+  isCommentsOpen.value = false
+  resetCommentsState(props.element.id)
+  return true
+}
+
 const loadComments = async () => {
+  if (!isBoardCommentsVisible.value) {
+    resetCommentsState(props.element.id)
+    return
+  }
+
   if (props.element.isDraft) {
     retroStore.setCommentsCache(props.element.id, [])
     hasLoadedComments.value = true
@@ -902,6 +928,7 @@ const loadComments = async () => {
     hasLoadedComments.value = true
   } catch (error) {
     if (requestId !== commentsLoadRequestId) return
+    if (handleCommentsDisabledError(error)) return
 
     commentsLoadError.value = getCommentApiErrorMessage(error, 'Не удалось загрузить комментарии')
   } finally {
@@ -914,6 +941,9 @@ const loadComments = async () => {
 const onCommentsToggleClick = (event: MouseEvent) => {
   event.preventDefault()
   event.stopPropagation()
+  if (!isBoardCommentsVisible.value) {
+    return
+  }
 
   isCommentsOpen.value = !isCommentsOpen.value
   const hasCache = retroStore.hasItemCommentsCache(props.element.id)
@@ -946,6 +976,19 @@ watch(
   },
 )
 
+watch(
+  isBoardCommentsVisible,
+  (isVisible) => {
+    if (isVisible) {
+      return
+    }
+
+    isCommentsOpen.value = false
+    resetCommentsState(props.element.id)
+  },
+  { immediate: true },
+)
+
 function startEditingOnTextAreaClick(e: MouseEvent) {
   e.stopPropagation()
   if (!cardUiState.value.canStartEditing) {
@@ -956,6 +999,14 @@ function startEditingOnTextAreaClick(e: MouseEvent) {
 }
 
 function openEditing() {
+  if (!canEditCardText.value) {
+    if (retroStore.activeItemId === props.element.id) {
+      retroStore.setActiveItemId(null)
+    }
+    pushNotification('error', 'Редактирование недоступно', 'Редактирование карточек отключено')
+    return
+  }
+
   if (!cardUiState.value.canStartEditing) {
     retroStore.clearActiveItemIfCardsHidden(props.element.id)
     return
@@ -969,12 +1020,30 @@ function openEditing() {
   })
 }
 
-function saveAndClose() {
-  void retroStore.updateItemDescription(props.element.id, editText.value.trim())
-  textareaRef.value?.blur()
-  isEditing.value = false
-  if (retroStore.activeItemId === props.element.id) {
-    retroStore.setActiveItemId(null)
+async function saveAndClose() {
+  try {
+    await retroStore.updateItemDescription(props.element.id, editText.value.trim())
+    textareaRef.value?.blur()
+    isEditing.value = false
+    if (retroStore.activeItemId === props.element.id) {
+      retroStore.setActiveItemId(null)
+    }
+  } catch (error) {
+    const status =
+      typeof error === 'object' &&
+      error !== null &&
+      'response' in error &&
+      typeof (error as { response?: { status?: number } }).response?.status === 'number'
+        ? (error as { response?: { status?: number } }).response?.status
+        : undefined
+
+    if (status === 403) {
+      pushNotification('error', 'Редактирование недоступно', 'Редактирование карточек отключено')
+      cancelEditing()
+      return
+    }
+
+    pushNotification('error', 'Ошибка API', 'Не удалось обновить текст карточки')
   }
 }
 
@@ -1016,7 +1085,7 @@ const onLikeButtonClick = (e: MouseEvent) => {
 
 const onCreateCommentSubmit = async () => {
   const text = newCommentText.value.trim()
-  if (!text || props.element.isDraft) return
+  if (!isBoardCommentsVisible.value || !text || props.element.isDraft) return
 
   isCreateCommentPending.value = true
   createCommentError.value = ''
@@ -1029,6 +1098,7 @@ const onCreateCommentSubmit = async () => {
     newCommentText.value = ''
     hasLoadedComments.value = true
   } catch (error) {
+    if (handleCommentsDisabledError(error)) return
     createCommentError.value = getCommentApiErrorMessage(error, 'Не удалось создать комментарий')
   } finally {
     isCreateCommentPending.value = false
@@ -1036,6 +1106,7 @@ const onCreateCommentSubmit = async () => {
 }
 
 const onStartCommentEditing = (comment: RetroItemCommentResponseDto) => {
+  if (!isBoardCommentsVisible.value) return
   if (!canEditComment(comment)) return
 
   commentActionError.value = ''
@@ -1051,6 +1122,8 @@ const onCancelCommentEditing = () => {
 }
 
 const onSaveEditedComment = async (commentId: number) => {
+  if (!isBoardCommentsVisible.value) return
+
   const text = editingCommentText.value.trim()
   if (!text) {
     editingCommentError.value = 'Комментарий не может быть пустым.'
@@ -1069,6 +1142,7 @@ const onSaveEditedComment = async (commentId: number) => {
 
     onCancelCommentEditing()
   } catch (error) {
+    if (handleCommentsDisabledError(error)) return
     editingCommentError.value = getCommentApiErrorMessage(error, 'Не удалось обновить комментарий')
   } finally {
     processingCommentId.value = null
@@ -1077,6 +1151,7 @@ const onSaveEditedComment = async (commentId: number) => {
 }
 
 const onDeleteComment = async (commentId: number) => {
+  if (!isBoardCommentsVisible.value) return
   const comment = comments.value.find((entry) => entry.id === commentId)
   if (!comment || !canDeleteComment(comment)) return
 
@@ -1096,6 +1171,7 @@ const onDeleteComment = async (commentId: number) => {
       onCancelCommentEditing()
     }
   } catch (error) {
+    if (handleCommentsDisabledError(error)) return
     commentActionError.value = getCommentApiErrorMessage(error, 'Не удалось удалить комментарий')
   } finally {
     processingCommentId.value = null

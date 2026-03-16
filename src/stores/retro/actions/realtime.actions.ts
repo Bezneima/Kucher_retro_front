@@ -118,6 +118,10 @@ const getCurrentBoard = (state: TRealtimeActionsContext): TRetroBoard | null => 
   return state.board[0] ?? null
 }
 
+const areBoardCommentsVisible = (state: TRealtimeActionsContext): boolean => {
+  return state.board[0]?.settings?.showComments ?? true
+}
+
 const isCurrentBoardEvent = (state: TRealtimeActionsContext, boardId: number | null) => {
   if (!boardId) {
     return false
@@ -810,6 +814,10 @@ export const realtimeActions = {
     if (!Number.isInteger(itemId) || itemId <= 0) {
       return []
     }
+    if (!areBoardCommentsVisible(this)) {
+      this.clearItemCommentsCache(itemId)
+      return []
+    }
 
     const comments = await retroCommentsService.getItemComments(itemId)
     this.setCommentsCache(itemId, comments)
@@ -1212,6 +1220,10 @@ export const realtimeActions = {
     void this.loadBoardColumns(boardId)
   },
   applyRealtimeItemCommentsFetched(this: TRealtimeActionsContext, payload: WsItemCommentsFetchedPayload) {
+    if (!areBoardCommentsVisible(this)) {
+      return
+    }
+
     const board = getCurrentBoard(this)
     if (!board) {
       return
@@ -1253,6 +1265,10 @@ export const realtimeActions = {
     this.setCommentsCache(resolvedItemId, comments)
   },
   applyRealtimeItemCommentCreated(this: TRealtimeActionsContext, payload: WsComment) {
+    if (!areBoardCommentsVisible(this)) {
+      return
+    }
+
     const boardId = asPositiveNumber(payload.boardId)
     const comment = toComment(payload)
     if (!comment || !isCurrentBoardEvent(this, boardId)) {
@@ -1279,6 +1295,10 @@ export const realtimeActions = {
     patchBoardReference(this)
   },
   applyRealtimeItemCommentUpdated(this: TRealtimeActionsContext, payload: WsComment) {
+    if (!areBoardCommentsVisible(this)) {
+      return
+    }
+
     const boardId = asPositiveNumber(payload.boardId)
     const comment = toComment(payload)
     if (!comment || !isCurrentBoardEvent(this, boardId)) {
@@ -1295,6 +1315,10 @@ export const realtimeActions = {
     this: TRealtimeActionsContext,
     payload: WsItemCommentDeletedPayload,
   ) {
+    if (!areBoardCommentsVisible(this)) {
+      return
+    }
+
     if (payload.deleted !== true) {
       return
     }

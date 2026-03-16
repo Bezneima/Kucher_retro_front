@@ -57,6 +57,7 @@
     />
 
     <button
+      v-if="canCreateCards"
       type="button"
       class="retro-group-add-item"
       title="Добавить карточку в группу"
@@ -148,6 +149,7 @@ const isDescriptionModalOpen = ref(false)
 const groupNameDraft = ref('')
 const groupDescriptionDraft = ref('')
 const isDragHandleHovered = ref(false)
+const canCreateCards = computed(() => retroStore.getCanEditBoardCards)
 
 const itemById = computed(() => {
   const map: Record<number, (typeof group.value.items)[number]> = {}
@@ -327,6 +329,10 @@ const onSelectColor = async (color: ColumnColor) => {
 }
 
 const onAddItemToGroupClick = () => {
+  if (!canCreateCards.value) {
+    return
+  }
+
   try {
     retroStore.addItemToGroup(props.columnId, group.value.id)
   } catch (error) {

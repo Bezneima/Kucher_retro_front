@@ -181,6 +181,8 @@ export type BoardSettingsUpdatedPayload = {
   boardId: number
   settings: {
     showLikes: boolean
+    showComments: boolean
+    canEditCards: boolean
   }
 }
 

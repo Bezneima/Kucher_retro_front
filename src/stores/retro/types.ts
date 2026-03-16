@@ -60,6 +60,8 @@ export type RetroColumn = {
 
 export type RetroBoardSettings = {
   showLikes: boolean
+  showComments: boolean
+  canEditCards: boolean
 }
 
 export type SyncPositionsResult = {

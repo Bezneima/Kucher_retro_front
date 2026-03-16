@@ -177,8 +177,14 @@ export const itemActions = {
     }
 
     item.syncedDescription = description
-    void httpClient.patch(`/retro/items/${itemId}/description`, { description })
-    console.info(toRaw(this.board))
+    try {
+      await httpClient.patch(`/retro/items/${itemId}/description`, { description })
+      console.info(toRaw(this.board))
+    } catch (error) {
+      item.description = persistedDescription
+      item.syncedDescription = persistedDescription
+      throw error
+    }
   },
 
   updateItemLike(this: TItemActionsContext, itemId: number, userId?: string | null) {

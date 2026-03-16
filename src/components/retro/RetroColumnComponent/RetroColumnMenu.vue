@@ -13,6 +13,7 @@
       <RetroColumnMenuActions
         v-if="!isColorMenuOpen"
         :column-color="props.columnColor"
+        :can-create-cards="props.canCreateCards"
         @edit-column="onEditColumnClick"
         @edit-description="onEditDescriptionClick"
         @copy-name="onCopyNameClick"
@@ -36,6 +37,7 @@ const props = defineProps<{
   isOpen: boolean
   anchorEl: HTMLElement | null
   columnColor?: string
+  canCreateCards?: boolean
 }>()
 
 const emit = defineEmits<{

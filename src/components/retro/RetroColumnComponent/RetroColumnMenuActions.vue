@@ -11,7 +11,7 @@
     <img src="@/assets/icons/svg/copy.svg" alt="" class="retro-item-menu-button__icon" />
     Копировать название
   </button>
-  <button class="retro-item-menu-button" type="button" @click="onCreateGroupClick">
+  <button v-if="props.canCreateCards !== false" class="retro-item-menu-button" type="button" @click="onCreateGroupClick">
     <img src="@/assets/icons/svg/addColumn.svg" alt="" class="retro-item-menu-button__icon" />
     Создать группу
   </button>
@@ -53,6 +53,7 @@ const emit = defineEmits<{
 
 const props = defineProps<{
   columnColor?: string
+  canCreateCards?: boolean
 }>()
 
 const onEditColumnClick = () => emit('editColumn')

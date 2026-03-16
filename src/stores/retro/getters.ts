@@ -15,6 +15,14 @@ const getDefaultLikesVisibility = () => {
   return true
 }
 
+const getDefaultCommentsVisibility = () => {
+  return true
+}
+
+const getDefaultCardsEditability = () => {
+  return true
+}
+
 export const retroGetters = {
   getBoard: (state: TRetroBoardState) => state.board,
   getBoardColumns: (state: TRetroBoardState) => state.board[0]?.columns ?? [],
@@ -23,13 +31,22 @@ export const retroGetters = {
   getCurrentBoardTeamId: (state: TRetroBoardState) => state.board[0]?.teamId ?? null,
   getIsAllCardsHidden: (state: TRetroBoardState) => state.board[0]?.isAllCardsHidden ?? false,
   getCurrentBoardSettings: (state: TRetroBoardState) =>
-    state.board[0]?.settings ?? { showLikes: getDefaultLikesVisibility() },
+    state.board[0]?.settings ?? {
+      showLikes: getDefaultLikesVisibility(),
+      showComments: getDefaultCommentsVisibility(),
+      canEditCards: getDefaultCardsEditability(),
+    },
   getIsBoardLikesVisible: (state: TRetroBoardState) =>
     state.board[0]?.settings?.showLikes ?? getDefaultLikesVisibility(),
+  getIsBoardCommentsVisible: (state: TRetroBoardState) =>
+    state.board[0]?.settings?.showComments ?? getDefaultCommentsVisibility(),
+  getCanEditBoardCards: (state: TRetroBoardState) =>
+    state.board[0]?.settings?.canEditCards ?? getDefaultCardsEditability(),
   getCardUiState:
     (state: TRetroBoardState) => (_itemId: number, isEditing: boolean, draftText: string) => {
       const isHidden = state.board[0]?.isAllCardsHidden ?? false
-      const canStartEditing = !isHidden
+      const canEditCards = state.board[0]?.settings?.canEditCards ?? getDefaultCardsEditability()
+      const canStartEditing = !isHidden && canEditCards
       const canCopyText = !isHidden
 
       return {

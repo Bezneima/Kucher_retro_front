@@ -1,5 +1,5 @@
 <template>
-  <button class="retro-item-menu-button" type="button" @click="onEditCardClick">
+  <button class="retro-item-menu-button" type="button" :disabled="!canEditCardText" @click="onEditCardClick">
     <img src="@/assets/icons/svg/pencil.svg" alt="" class="retro-item-menu-button__icon" />
     Редактировать карточку
   </button>
@@ -31,6 +31,9 @@
 </template>
 
 <script setup lang="ts">
+import { computed } from 'vue'
+import { useRetroStore } from '@/stores/RetroStore'
+
 const emit = defineEmits<{
   editCard: []
   copyText: []
@@ -43,7 +46,16 @@ const props = defineProps<{
   cardColor?: string
 }>()
 
-const onEditCardClick = () => emit('editCard')
+const retroStore = useRetroStore()
+const canEditCardText = computed(() => retroStore.getCanEditBoardCards)
+
+const onEditCardClick = () => {
+  if (!canEditCardText.value) {
+    return
+  }
+
+  emit('editCard')
+}
 const onCopyTextClick = () => emit('copyText')
 const onOpenColorMenuClick = () => emit('openColorMenu')
 const onRemoveColorClick = () => emit('removeColor')
@@ -76,6 +88,15 @@ const onDeleteCardClick = () => emit('deleteCard')
 
 .retro-item-menu-button:hover {
   background: #eef4fe;
+}
+
+.retro-item-menu-button:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.retro-item-menu-button:disabled:hover {
+  background: transparent;
 }
 
 .retro-item-menu-button-delete {

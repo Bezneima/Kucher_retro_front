@@ -2,7 +2,7 @@
   <button
     type="button"
     class="board-action-button board-team-settings-trigger"
-    :disabled="isTeamSettingsLoading || isTeamSettingsSaving || !teamId"
+    :disabled="isTeamSettingsLoading || isTeamSettingsSaving || isBoardSettingsSaving || !teamId"
     aria-label="Настройки"
     title="Настройки"
     @click="openTeamSettingsModal"
@@ -20,7 +20,7 @@
       <button
         class="board-team-settings-modal-close"
         type="button"
-        :disabled="isTeamSettingsSaving || isBoardLikesSaving"
+        :disabled="isTeamSettingsSaving || isBoardSettingsSaving"
         @click="closeTeamSettingsModal"
       >
         ×
@@ -52,12 +52,56 @@
 
         <button
           type="button"
-          class="board-team-settings-like-toggle"
+          class="board-team-settings-visibility-toggle"
           :disabled="isBoardLikesToggleDisabled"
           @click="onBoardLikesToggleClick"
         >
-          <SvgIcon :name="boardLikesButtonIcon" class="board-team-settings-like-toggle__icon" />
+          <SvgIcon :name="boardLikesButtonIcon" class="board-team-settings-visibility-toggle__icon" />
           <span>{{ boardLikesButtonLabel }}</span>
+        </button>
+      </div>
+
+      <div class="board-team-settings-field">
+        <div class="board-team-settings-field-content">
+          <p class="board-team-settings-field-title">Комментарии карточек</p>
+          <p class="board-team-settings-field-description">
+            Управление отображением и доступностью комментариев на доске.
+          </p>
+        </div>
+
+        <button
+          type="button"
+          class="board-team-settings-visibility-toggle"
+          :disabled="isBoardCommentsToggleDisabled"
+          @click="onBoardCommentsToggleClick"
+        >
+          <SvgIcon
+            :name="boardCommentsButtonIcon"
+            class="board-team-settings-visibility-toggle__icon"
+          />
+          <span>{{ boardCommentsButtonLabel }}</span>
+        </button>
+      </div>
+
+      <div class="board-team-settings-field">
+        <div class="board-team-settings-field-content">
+          <p class="board-team-settings-field-title">Разрешить редактирование карточек</p>
+          <p class="board-team-settings-field-description">
+            Управление возможностью изменять текст карточек на доске.
+          </p>
+        </div>
+
+        <button
+          type="button"
+          class="board-team-settings-visibility-toggle"
+          :disabled="isBoardCardsEditingToggleDisabled"
+          @click="onBoardCardsEditingToggleClick"
+        >
+          <SvgIcon
+            :name="boardCardsEditingButtonIcon"
+            class="board-team-settings-visibility-toggle__icon"
+          />
+          <span>{{ boardCardsEditingButtonLabel }}</span>
         </button>
       </div>
 
@@ -65,7 +109,7 @@
         <button
           type="button"
           class="board-team-settings-button"
-          :disabled="isTeamSettingsSaving || isBoardLikesSaving"
+          :disabled="isTeamSettingsSaving || isBoardSettingsSaving"
           @click="closeTeamSettingsModal"
         >
           Cancel
@@ -73,7 +117,7 @@
         <button
           type="button"
           class="board-team-settings-button board-team-settings-button--primary"
-          :disabled="isTeamSettingsToggleDisabled || isBoardLikesSaving"
+          :disabled="isTeamSettingsToggleDisabled || isBoardSettingsSaving"
           @click="submitTeamSettingsModal"
         >
           {{ isTeamSettingsSaving ? 'Saving...' : 'Save' }}
@@ -104,12 +148,16 @@ const isTeamSettingsSaving = ref(false)
 const isTeamSettingsModalOpen = ref(false)
 const teamSettingsAnonymousAccessDraft = ref(false)
 const isTeamSettingsOverlayPointerDown = ref(false)
-const isBoardLikesSaving = ref(false)
+const isBoardSettingsSaving = ref(false)
 const isBoardLikesLocked = ref(false)
+const isBoardCommentsLocked = ref(false)
+const isBoardCardsEditingLocked = ref(false)
 const { pushNotification } = useBoardNotifications()
 let teamSettingsRequestId = 0
 
 const currentShowLikes = computed(() => retroStore.getIsBoardLikesVisible)
+const currentShowComments = computed(() => retroStore.getIsBoardCommentsVisible)
+const currentCanEditCards = computed(() => retroStore.getCanEditBoardCards)
 
 const boardLikesButtonLabel = computed(() => {
   return currentShowLikes.value ? 'Выключить лайки' : 'Включить лайки'
@@ -119,16 +167,52 @@ const boardLikesButtonIcon = computed(() => {
   return currentShowLikes.value ? 'filledLike' : 'like'
 })
 
+const boardCommentsButtonLabel = computed(() => {
+  return currentShowComments.value ? 'Выключить комментарии' : 'Включить комментарии'
+})
+
+const boardCommentsButtonIcon = computed(() => {
+  return currentShowComments.value ? 'filledComment' : 'comment'
+})
+
+const boardCardsEditingButtonLabel = computed(() => {
+  return currentCanEditCards.value ? 'Запретить редактирование' : 'Разрешить редактирование'
+})
+
+const boardCardsEditingButtonIcon = computed(() => {
+  return 'pencil'
+})
+
 const isTeamSettingsToggleDisabled = computed(() => {
   return isTeamSettingsLoading.value || isTeamSettingsSaving.value || !props.teamId
 })
 
 const isBoardLikesToggleDisabled = computed(() => {
   return (
-    isBoardLikesSaving.value ||
+    isBoardSettingsSaving.value ||
     isTeamSettingsSaving.value ||
     isTeamSettingsLoading.value ||
     isBoardLikesLocked.value ||
+    !props.boardId
+  )
+})
+
+const isBoardCommentsToggleDisabled = computed(() => {
+  return (
+    isBoardSettingsSaving.value ||
+    isTeamSettingsSaving.value ||
+    isTeamSettingsLoading.value ||
+    isBoardCommentsLocked.value ||
+    !props.boardId
+  )
+})
+
+const isBoardCardsEditingToggleDisabled = computed(() => {
+  return (
+    isBoardSettingsSaving.value ||
+    isTeamSettingsSaving.value ||
+    isTeamSettingsLoading.value ||
+    isBoardCardsEditingLocked.value ||
     !props.boardId
   )
 })
@@ -139,6 +223,8 @@ const resetLocalState = () => {
   isTeamSettingsOverlayPointerDown.value = false
   teamSettingsAnonymousAccessDraft.value = false
   isBoardLikesLocked.value = false
+  isBoardCommentsLocked.value = false
+  isBoardCardsEditingLocked.value = false
 }
 
 const loadCurrentTeamSettings = async (teamId: number, notifyOnError = false) => {
@@ -172,7 +258,7 @@ const loadCurrentTeamSettings = async (teamId: number, notifyOnError = false) =>
 }
 
 const openTeamSettingsModal = async () => {
-  if (isTeamSettingsSaving.value || isBoardLikesSaving.value || !props.teamId) {
+  if (isTeamSettingsSaving.value || isBoardSettingsSaving.value || !props.teamId) {
     return
   }
 
@@ -188,7 +274,7 @@ const openTeamSettingsModal = async () => {
 }
 
 const closeTeamSettingsModal = () => {
-  if (isTeamSettingsSaving.value || isBoardLikesSaving.value) {
+  if (isTeamSettingsSaving.value || isBoardSettingsSaving.value) {
     return
   }
 
@@ -206,7 +292,7 @@ const onTeamSettingsOverlayPointerUp = (event: PointerEvent) => {
     isTeamSettingsOverlayPointerDown.value &&
     event.target === event.currentTarget &&
     !isTeamSettingsSaving.value &&
-    !isBoardLikesSaving.value
+    !isBoardSettingsSaving.value
   isTeamSettingsOverlayPointerDown.value = false
 
   if (!shouldClose) {
@@ -219,7 +305,7 @@ const onTeamSettingsOverlayPointerUp = (event: PointerEvent) => {
 const submitTeamSettingsModal = async () => {
   if (
     isTeamSettingsSaving.value ||
-    isBoardLikesSaving.value ||
+    isBoardSettingsSaving.value ||
     isTeamSettingsLoading.value ||
     !props.teamId ||
     !currentTeamSettings.value
@@ -277,11 +363,13 @@ const onBoardLikesToggleClick = async () => {
   }
 
   const nextShowLikes = !currentShowLikes.value
-  isBoardLikesSaving.value = true
+  isBoardSettingsSaving.value = true
 
   try {
     const response = await retroBoardService.updateBoardSettings(props.boardId, {
       showLikes: nextShowLikes,
+      showComments: currentShowComments.value,
+      canEditCards: currentCanEditCards.value,
     })
 
     retroStore.applyBoardSettingsFromPayload(response)
@@ -296,7 +384,77 @@ const onBoardLikesToggleClick = async () => {
 
     pushNotification('error', 'Ошибка API', apiError.message)
   } finally {
-    isBoardLikesSaving.value = false
+    isBoardSettingsSaving.value = false
+  }
+}
+
+const onBoardCommentsToggleClick = async () => {
+  if (isBoardCommentsToggleDisabled.value || !props.boardId) {
+    return
+  }
+
+  const nextShowComments = !currentShowComments.value
+  isBoardSettingsSaving.value = true
+
+  try {
+    const response = await retroBoardService.updateBoardSettings(props.boardId, {
+      showLikes: currentShowLikes.value,
+      showComments: nextShowComments,
+      canEditCards: currentCanEditCards.value,
+    })
+
+    retroStore.applyBoardSettingsFromPayload(response)
+    pushNotification('success', nextShowComments ? 'Комментарии включены' : 'Комментарии выключены')
+  } catch (error) {
+    const apiError = toBoardApiError(error)
+    if (apiError.status === 403) {
+      isBoardCommentsLocked.value = true
+      pushNotification(
+        'error',
+        'Недостаточно прав',
+        'Изменение режима комментариев недоступно для вашей роли',
+      )
+      return
+    }
+
+    pushNotification('error', 'Ошибка API', apiError.message)
+  } finally {
+    isBoardSettingsSaving.value = false
+  }
+}
+
+const onBoardCardsEditingToggleClick = async () => {
+  if (isBoardCardsEditingToggleDisabled.value || !props.boardId) {
+    return
+  }
+
+  const nextCanEditCards = !currentCanEditCards.value
+  isBoardSettingsSaving.value = true
+
+  try {
+    const response = await retroBoardService.updateBoardSettings(props.boardId, {
+      showLikes: currentShowLikes.value,
+      showComments: currentShowComments.value,
+      canEditCards: nextCanEditCards,
+    })
+
+    retroStore.applyBoardSettingsFromPayload(response)
+    pushNotification('success', nextCanEditCards ? 'Редактирование карточек включено' : 'Редактирование карточек выключено')
+  } catch (error) {
+    const apiError = toBoardApiError(error)
+    if (apiError.status === 403) {
+      isBoardCardsEditingLocked.value = true
+      pushNotification(
+        'error',
+        'Недостаточно прав',
+        'Изменение режима редактирования карточек недоступно для вашей роли',
+      )
+      return
+    }
+
+    pushNotification('error', 'Ошибка API', apiError.message)
+  } finally {
+    isBoardSettingsSaving.value = false
   }
 }
 
@@ -317,6 +475,8 @@ watch(
   () => props.boardId,
   () => {
     isBoardLikesLocked.value = false
+    isBoardCommentsLocked.value = false
+    isBoardCardsEditingLocked.value = false
   },
 )
 </script>
@@ -480,7 +640,7 @@ watch(
   cursor: not-allowed;
 }
 
-.board-team-settings-like-toggle {
+.board-team-settings-visibility-toggle {
   border: 1px solid #ccdaef;
   border-radius: 8px;
   padding: 8px 12px;
@@ -494,13 +654,13 @@ watch(
   white-space: nowrap;
 }
 
-.board-team-settings-like-toggle__icon {
+.board-team-settings-visibility-toggle__icon {
   width: 14px;
   height: 14px;
   color: currentColor;
 }
 
-.board-team-settings-like-toggle:disabled {
+.board-team-settings-visibility-toggle:disabled {
   opacity: 0.7;
   cursor: not-allowed;
 }

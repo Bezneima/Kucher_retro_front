@@ -14,6 +14,8 @@ import type {
 type TRecord = Record<string, unknown>
 const DEFAULT_BOARD_SETTINGS: RetroBoardSettings = {
   showLikes: true,
+  showComments: true,
+  canEditCards: true,
 }
 
 const resolveInitialBoardSettings = (): RetroBoardSettings => {
@@ -53,6 +55,8 @@ const asBoardSettings = (
 
   return {
     showLikes: typeof value.showLikes === 'boolean' ? value.showLikes : fallback.showLikes,
+    showComments: typeof value.showComments === 'boolean' ? value.showComments : fallback.showComments,
+    canEditCards: typeof value.canEditCards === 'boolean' ? value.canEditCards : fallback.canEditCards,
   }
 }
 
@@ -67,6 +71,11 @@ const clearBoardLikes = (board: TRetroBoard) => {
       }
     }
   }
+}
+
+const clearBoardCommentsCache = (state: Pick<TRetroBoardState, 'commentsByItemId' | 'commentItemIdByCommentId'>) => {
+  state.commentsByItemId = {}
+  state.commentItemIdByCommentId = {}
 }
 
 const resolveBoardPayload = (payload: unknown): TRecord | null => {
@@ -137,7 +146,11 @@ const extractBoardSettingsFromAnyPayload = (
     if (isRecord(payload.settings)) {
       return asBoardSettings(payload.settings, fallback)
     }
-    if (typeof payload.showLikes === 'boolean') {
+    if (
+      typeof payload.showLikes === 'boolean' ||
+      typeof payload.showComments === 'boolean' ||
+      typeof payload.canEditCards === 'boolean'
+    ) {
       return asBoardSettings(payload, fallback)
     }
   }
@@ -147,12 +160,12 @@ const extractBoardSettingsFromAnyPayload = (
     if ('settings' in boardPayload) {
       return asBoardSettings(boardPayload.settings, fallback)
     }
-    if ('showLikes' in boardPayload) {
+    if ('showLikes' in boardPayload || 'showComments' in boardPayload || 'canEditCards' in boardPayload) {
       return asBoardSettings(boardPayload, fallback)
     }
   }
 
-  if (isRecord(payload) && 'showLikes' in payload) {
+  if (isRecord(payload) && ('showLikes' in payload || 'showComments' in payload || 'canEditCards' in payload)) {
     return asBoardSettings(payload, fallback)
   }
 
@@ -161,21 +174,41 @@ const extractBoardSettingsFromAnyPayload = (
 
 const hasBoardSettingsInPayload = (payload: unknown): boolean => {
   if (isRecord(payload)) {
-    if (isRecord(payload.settings) && typeof payload.settings.showLikes === 'boolean') {
+    if (
+      isRecord(payload.settings) &&
+      (
+        typeof payload.settings.showLikes === 'boolean' ||
+        typeof payload.settings.showComments === 'boolean' ||
+        typeof payload.settings.canEditCards === 'boolean'
+      )
+    ) {
       return true
     }
-    if (typeof payload.showLikes === 'boolean') {
+    if (
+      typeof payload.showLikes === 'boolean' ||
+      typeof payload.showComments === 'boolean' ||
+      typeof payload.canEditCards === 'boolean'
+    ) {
       return true
     }
   }
 
   const boardPayload = resolveBoardPayload(payload)
   if (boardPayload) {
-    if (isRecord(boardPayload.settings) && typeof boardPayload.settings.showLikes === 'boolean') {
+    if (
+      isRecord(boardPayload.settings) &&
+      (typeof boardPayload.settings.showLikes === 'boolean' ||
+        typeof boardPayload.settings.showComments === 'boolean' ||
+        typeof boardPayload.settings.canEditCards === 'boolean')
+    ) {
       return true
     }
 
-    if (typeof boardPayload.showLikes === 'boolean') {
+    if (
+      typeof boardPayload.showLikes === 'boolean' ||
+      typeof boardPayload.showComments === 'boolean' ||
+      typeof boardPayload.canEditCards === 'boolean'
+    ) {
       return true
     }
   }
@@ -341,6 +374,9 @@ export const boardActions = {
     if (currentBoard.settings.showLikes === false) {
       clearBoardLikes(currentBoard)
     }
+    if (currentBoard.settings.showComments === false) {
+      clearBoardCommentsCache(this)
+    }
     this.board = [{ ...currentBoard }]
   },
   normalizeColumns(this: TBoardActionsContext, columnsData: unknown) {
@@ -350,8 +386,7 @@ export const boardActions = {
     if (!boardData) {
       this.board = []
       this.currentUserTeamRole = null
-      this.commentsByItemId = {}
-      this.commentItemIdByCommentId = {}
+      clearBoardCommentsCache(this)
       this.lastSyncedPositions = {}
       return
     }
@@ -360,8 +395,7 @@ export const boardActions = {
     if (!boardId) {
       this.board = []
       this.currentUserTeamRole = null
-      this.commentsByItemId = {}
-      this.commentItemIdByCommentId = {}
+      clearBoardCommentsCache(this)
       this.lastSyncedPositions = {}
       return
     }
@@ -394,8 +428,7 @@ export const boardActions = {
     }
 
     this.board = [board]
-    this.commentsByItemId = {}
-    this.commentItemIdByCommentId = {}
+    clearBoardCommentsCache(this)
     this.setLastSyncedPositions()
   },
   async loadBoardForUser(this: TBoardActionsContext) {
@@ -454,15 +487,13 @@ export const boardActions = {
       }
 
       this.board = [board]
-      this.commentsByItemId = {}
-      this.commentItemIdByCommentId = {}
+      clearBoardCommentsCache(this)
       this.setLastSyncedPositions()
     } catch (error) {
       console.error('[retro] failed to load board by id', boardId, error)
       this.board = []
       this.currentUserTeamRole = null
-      this.commentsByItemId = {}
-      this.commentItemIdByCommentId = {}
+      clearBoardCommentsCache(this)
       this.lastSyncedPositions = {}
       throw error
     } finally {
@@ -489,6 +520,9 @@ export const boardActions = {
       currentBoard.settings = extractBoardSettingsFromBoardPayload(columnsPayload, currentBoard.settings)
       if (currentBoard.settings.showLikes === false) {
         clearBoardLikes(currentBoard)
+      }
+      if (currentBoard.settings.showComments === false) {
+        clearBoardCommentsCache(this)
       }
       this.board = [{ ...currentBoard }]
       this.setLastSyncedPositions()
