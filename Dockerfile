@@ -1,7 +1,7 @@
 FROM node:22 AS builder
 WORKDIR /usr/src/app
 COPY . .
-ENV VITE_RETRO_API_BASE_URL=http://5.129.220.111:3000
+ENV VITE_RETRO_API_BASE_URL=https://retroboard.tech
 RUN npm ci
 RUN npm run build
 
